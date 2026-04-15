@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commission Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia', serif; background: #f5f3ef; color: #1a1a1a; min-height: 100vh; }
+  header { background: #1a1a1a; color: #f5f3ef; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 1.1rem; font-weight: 400; letter-spacing: 0.08em; text-transform: uppercase; }
+  header span { font-size: 0.75rem; color: #888; letter-spacing: 0.05em; }
+  nav { background: #fff; border-bottom: 1px solid #e0ddd8; display: flex; gap: 0; flex-wrap: wrap; }
+  nav button { padding: 0.85rem 1.5rem; border: none; background: none; cursor: pointer; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: #888; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  nav button:hover { color: #1a1a1a; }
+  nav button.active { color: #1a1a1a; border-bottom-color: #1a1a1a; }
+  main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .page-title { font-size: 1.4rem; font-weight: 400; margin-bottom: 0.25rem; }
+  .page-sub { font-size: 0.85rem; color: #888; margin-bottom: 2rem; }
+  .card { background: #fff; border: 1px solid #e0ddd8; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .card-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 1rem; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+  .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+  .form-group label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; }
+  .form-group input, .form-group select, .form-group textarea { padding: 0.6rem 0.75rem; border: 1px solid #d0cdc8; border-radius: 4px; font-size: 0.9rem; font-family: inherit; background: #fff; color: #1a1a1a; transition: border-color 0.15s; }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: #1a1a1a; }
+  .form-group.full { grid-column: 1 / -1; }
+  .btn { padding: 0.6rem 1.4rem; border: 1px solid #1a1a1a; background: #1a1a1a; color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.82rem; letter-spacing: 0.05em; text-transform: uppercase; transition: all 0.15s; }
+  .btn:hover { background: #333; }
+  .btn.secondary { background: #fff; color: #1a1a1a; }
+  .btn.secondary:hover { background: #f5f3ef; }
+  .btn.danger { background: #fff; color: #c0392b; border-color: #c0392b; }
+  .btn.danger:hover { background: #fdf0ef; }
+  .btn.small { padding: 0.35rem 0.8rem; font-size: 0.75rem; }
+  .btn-row { display: flex; gap: 0.75rem; align-items: center; margin-top: 1.25rem; flex-wrap: wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; padding: 0.6rem 0.75rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; border-bottom: 1px solid #e0ddd8; font-weight: 400; }
+  td { padding: 0.7rem 0.75rem; border-bottom: 1px solid #f0ede8; color: #1a1a1a; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #faf9f7; }
+  .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 3px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; }
+  .badge.building { background: #e8f0fb; color: #1a5cb5; }
+  .badge.wholesaler { background: #e8f5ef; color: #1a7a4a; }
+  .badge.spa { background: #fdf0fb; color: #8a1a9a; }
+  .badge.state_fair { background: #fdf5e8; color: #9a5a1a; }
+  .badge.other { background: #f0ede8; color: #666; }
+  .badge.active { background: #e8f5ef; color: #1a7a4a; }
+  .badge.inactive { background: #f5f0ee; color: #888; }
+  .status-x { color: #c0392b; font-weight: 500; cursor: pointer; }
+  .status-paid { color: #1a7a4a; font-size: 0.78rem; cursor: pointer; }
+  .status-empty { color: #ccc; cursor: pointer; }
+  .calc-preview { background: #f5f3ef; border-radius: 4px; padding: 1rem; margin-top: 1rem; font-size: 0.85rem; }
+  .calc-row { display: flex; justify-content: space-between; padding: 0.2rem 0; }
+  .calc-row.total { font-weight: 500; border-top: 1px solid #d0cdc8; margin-top: 0.5rem; padding-top: 0.5rem; }
+  .msg { padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.85rem; margin-bottom: 1rem; }
+  .msg.success { background: #e8f5ef; color: #1a7a4a; border: 1px solid #b0dcc0; }
+  .msg.error { background: #fdf0ef; color: #c0392b; border: 1px solid #f0c0bc; }
+  .empty-state { text-align: center; padding: 3rem; color: #aaa; font-size: 0.9rem; }
+  .divider { border: none; border-top: 1px solid #e0ddd8; margin: 1.5rem 0; }
+  .period-label { font-size: 0.8rem; color: #888; background: #f5f3ef; border: 1px solid #e0ddd8; border-radius: 3px; padding: 0.3rem 0.75rem; display: inline-block; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card { background: #f5f3ef; border-radius: 6px; padding: 1rem; }
+  .stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 0.35rem; }
+  .stat-value { font-size: 1.25rem; font-weight: 500; }
+  .stat-sub { font-size: 0.78rem; color: #888; margin-top: 0.2rem; }
+  .tier-badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 3px; font-size: 0.72rem; font-weight: 500; background: #1a1a1a; color: #fff; }
+  .month-table td, .month-table th { padding: 0.5rem 0.75rem; }
+  .override-row { background: #f5f3ef; font-size: 0.82rem; }
+  @media (max-width: 600px) { main { padding: 1rem; } .form-grid { grid-template-columns: 1fr; } nav button { padding: 0.7rem 0.9rem; font-size: 0.75rem; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Commission Tracker</h1>
+  <span id="period-display">Loading...</span>
+</header>
+<nav>
+  <button class="active" onclick="showSection('sales',this)">Log Sale</button>
+  <button onclick="showSection('ledger',this)">Ledger</button>
+  <button onclick="showSection('dashboard',this)">Dashboard</button>
+  <button onclick="showSection('manager',this)">Sales Manager</button>
+  <button onclick="showSection('people',this)">Salespeople</button>
+  <button onclick="showSection('reports',this)">Reports</button>
+  <button onclick="showSection('rates',this)">Rates</button>
+</nav>
+<main>
+  <div id="msg-global"></div>
+
+  <!-- LOG SALE -->
+  <div id="sales" class="section active">
+    <p class="page-title" id="sale-form-title">Log a sale</p>
+    <p class="page-sub" id="sale-form-sub">Commission is calculated automatically based on salesperson type and monthly totals.</p>
+    <div class="card">
+      <p class="card-title">Sale details</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="s-date">
+        </div>
+        <div class="form-group">
+          <label>Salesperson</label>
+          <select id="s-person" onchange="onPersonChange()">
+            <option value="">Select...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sale type</label>
+          <select id="s-type" onchange="onTypeChange()">
+            <option value="">Select...</option>
+            <option value="deck">Deck</option>
+            <option value="building">Building</option>
+            <option value="map">MAP (in-home)</option>
+            <option value="pool">Pool</option>
+            <option value="spa">Spa</option>
+            <option value="chemical">Chemical / Filter</option>
+            <option value="wholesale">Wholesale</option>
+            <option value="concrete">Concrete (overage only)</option>
+            <option value="state_fair">State Fair</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Customer name</label>
+          <input type="text" id="s-customer" placeholder="Last name or full name">
+        </div>
+        <div class="form-group">
+          <label>Product</label>
+          <input type="text" id="s-product" placeholder="e.g. 12X16 Deck, LSX 700">
+        </div>
+        <div class="form-group">
+          <label>Par price ($)</label>
+          <input type="number" id="s-par" step="0.01" oninput="calcCommission()">
+        </div>
+        <div class="form-group">
+          <label>Sale price ($)</label>
+          <input type="number" id="s-saleprice" step="0.01" oninput="calcCommission()">
+        </div>
+        <div class="form-group">
+          <label>Rate (%)</label>
+          <input type="number" id="s-rate" step="0.01" oninput="calcCommission()" placeholder="Auto">
+        </div>
+        <div class="form-group">
+          <label>Commission amount ($)</label>
+          <input type="number" id="s-commission" step="0.01" placeholder="Auto">
+        </div>
+        <div class="form-group">
+          <label>Overage ($)</label>
+          <input type="number" id="s-overage" step="0.01" value="0" oninput="calcCommission()">
+        </div>
+        <div class="form-group">
+          <label>Spiff ($)</label>
+          <input type="number" id="s-spiff" step="0.01" value="0">
+        </div>
+        <div class="form-group">
+          <label>Pd commission</label>
+          <select id="s-pdcomm">
+            <option value="">Unpaid</option>
+            <option value="X">X — approved</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Pd overage</label>
+          <select id="s-pdovg">
+            <option value="">Unpaid</option>
+            <option value="X">X — approved</option>
+          </select>
+        </div>
+      </div>
+      <hr class="divider">
+      <p class="card-title">Split sale (optional)</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Split salesperson</label>
+          <select id="s-split" onchange="calcCommission()">
+            <option value="">None</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Split rate (%)</label>
+          <input type="number" id="s-splitrate" step="0.01" placeholder="Auto">
+        </div>
+        <div class="form-group">
+          <label>Split overage ($)</label>
+          <input type="number" id="s-splitovg" step="0.01" placeholder="Auto (50%)">
+        </div>
+        <div class="form-group">
+          <label>Split spiff ($)</label>
+          <input type="number" id="s-splitspiff" step="0.01" placeholder="Auto (50%)">
+        </div>
+        <div class="form-group">
+          <label>Primary credit (% of sale)</label>
+          <input type="number" id="s-creditpct" step="1" min="0" max="100" placeholder="50" oninput="calcCommission()">
+        </div>
+      </div>
+      <hr class="divider">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Notes</label>
+          <textarea id="s-notes" rows="2" placeholder="Unusual rate, manager override, etc."></textarea>
+        </div>
+      </div>
+      <div id="calc-preview" class="calc-preview" style="display:none;"></div>
+      <div class="btn-row">
+        <button class="btn" id="save-btn" onclick="saveSale()">Save sale</button>
+        <button class="btn secondary" onclick="clearSaleForm()">Clear</button>
+        <button class="btn danger" id="cancel-edit-btn" style="display:none" onclick="clearSaleForm()">Cancel edit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEDGER -->
+  <div id="ledger" class="section">
+    <p class="page-title">Sales ledger</p>
+    <p class="page-sub">Click any pd commission or pd overage cell to toggle its status. Click a date to undo.</p>
+    <div class="card" style="padding: 1rem;">
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;">
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+          <div class="form-group">
+            <label>Filter by person</label>
+            <select id="f-person" onchange="loadLedger()">
+              <option value="">All salespeople</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="f-status" onchange="loadLedger()">
+              <option value="open">Open (unpaid items)</option>
+              <option value="all">All records</option>
+            </select>
+          </div>
+          <button class="btn secondary small" onclick="loadLedger()">Refresh</button>
+        </div>
+        <button class="btn small" onclick="markAllXPaid()">Mark all X as paid</button>
+      </div>
+    </div>
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Salesperson</th><th>Customer</th><th>Product</th><th>Type</th>
+              <th>Par</th><th>Rate</th><th>Commission</th><th>Pd Comm</th>
+              <th>Overage</th><th>Pd Ovg</th><th>Spiff</th><th>Split</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-body">
+            <tr><td colspan="14" class="empty-state">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" class="section">
+    <p class="page-title">Dashboard</p>
+    <p class="page-sub">Monthly performance by salesperson for the current year.</p>
+    <div class="card" style="padding: 1rem;">
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+        <div class="form-group">
+          <label>Salesperson</label>
+          <select id="d-person" onchange="loadDashboard()">
+            <option value="">Select a salesperson...</option>
+          </select>
+        </div>
+        <button class="btn secondary small" onclick="loadDashboard()">Refresh</button>
+      </div>
+    </div>
+    <div id="dashboard-content"></div>
+  </div>
+
+  <!-- SALES MANAGER -->
+  <div id="manager" class="section">
+    <p class="page-title">Sales manager</p>
+    <p class="page-sub">Override commission (1.5% of par) on all buildings, decks, MAP, pools, and wholesale sales.</p>
+    <div class="card" style="padding: 1rem;">
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;">
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+          <div class="form-group">
+            <label>Month</label>
+            <select id="m-month" onchange="loadManager()">
+              <option value="0">January</option><option value="1">February</option>
+              <option value="2">March</option><option value="3">April</option>
+              <option value="4">May</option><option value="5">June</option>
+              <option value="6">July</option><option value="7">August</option>
+              <option value="8">September</option><option value="9">October</option>
+              <option value="10">November</option><option value="11">December</option>
+            </select>
+          </div>
+          <button class="btn secondary small" onclick="loadManager()">Refresh</button>
+        </div>
+      </div>
+    </div>
+    <div id="manager-content"></div>
+  </div>
+
+  <!-- SALESPEOPLE -->
+  <div id="people" class="section">
+    <p class="page-title">Salespeople</p>
+    <p class="page-sub">Manage your roster. Inactive salespeople are hidden from sale entry but kept in history.</p>
+    <div class="card">
+      <p class="card-title">Add salesperson</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Full name</label>
+          <input type="text" id="p-name" placeholder="First Last">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="p-email" placeholder="email@example.com">
+        </div>
+        <div class="form-group">
+          <label>System type</label>
+          <select id="p-type">
+            <option value="building">Building store</option>
+            <option value="wholesaler">Wholesaler</option>
+            <option value="spa">Spa store</option>
+            <option value="state_fair">State fair</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Reports</label>
+          <select id="p-printonly">
+            <option value="false">Email + print</option>
+            <option value="true">Print only</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:1rem">
+        <div class="form-group full">
+          <label style="display:flex;align-items:center;gap:0.5rem;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="p-manager" style="width:auto;padding:0;border:none">
+            Sales manager (receives override commission report)
+          </label>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="savePerson()">Add salesperson</button>
+      </div>
+    </div>
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <table>
+        <thead><tr><th>Name</th><th>System</th><th>Email</th><th>Reports</th><th>Mgr</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="people-body"><tr><td colspan="7" class="empty-state">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RATES -->
+  <div id="rates" class="section">
+    <p class="page-title">Commission rates</p>
+    <p class="page-sub">Reference for all commission structures.</p>
+    <div class="card">
+      <p class="card-title">Building store sliding scale</p>
+      <table><thead><tr><th>Monthly sales range</th><th>Rate</th></tr></thead>
+      <tbody id="rates-building"></tbody></table>
+    </div>
+    <div class="card">
+      <p class="card-title">Fixed rates by sale type</p>
+      <table><thead><tr><th>Type</th><th>Commission</th><th>Overage</th><th>Manager override</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>MAP (in-home)</td><td>6%</td><td>50%</td><td>Yes — 1.5% of par</td><td>Flat rate regardless of monthly total</td></tr>
+        <tr><td>Pool</td><td>4%</td><td>50%</td><td>Yes — 1.5% of par</td><td></td></tr>
+        <tr><td>Spa</td><td>8%</td><td>50%</td><td>No</td><td>30% down required. Min 3% or flat $ if below par</td></tr>
+        <tr><td>Wholesale</td><td>10% of par</td><td>100%</td><td>Yes — 1.5% of par</td><td>Exclusive: 25% down + completion. Multi-brand: delivery only</td></tr>
+        <tr><td>Chemical / Filter</td><td>4%</td><td>None</td><td>No</td><td></td></tr>
+        <tr><td>Concrete</td><td>None</td><td>50%</td><td>No</td><td>Overage only</td></tr>
+        <tr><td>State Fair</td><td>Varies</td><td>None</td><td>No</td><td>Commission + spiffs only</td></tr>
+        <tr><td>Other</td><td>Manual</td><td>Manual</td><td>No</td><td>Fully manual entry</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div id="reports" class="section">
+    <p class="page-title">Reports</p>
+    <p class="page-sub">Generate commission reports for the current pay period. Reports open in a new tab for printing and are saved to Google Drive.</p>
+    <div class="card" style="padding:1rem;">
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;">
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;">
+          <div class="form-group">
+            <label>Pay period</label>
+            <input type="text" id="r-period" placeholder="e.g. April 1-15, 2026" style="min-width:200px">
+          </div>
+          <div class="form-group">
+            <label>Salesperson</label>
+            <select id="r-person">
+              <option value="">All salespeople</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button class="btn secondary" onclick="generateReport()">Generate selected</button>
+          <button class="btn" onclick="generateAllReports()">Generate all reports</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <p class="card-title">How reports work</p>
+      <p style="font-size:0.85rem;color:#555;line-height:1.7">Each report shows all sales currently on the books that have not been fully paid. Items marked <strong>X</strong> in Comm Paid or Ovg Paid are included in the period totals. After generating, the report opens in a new tab where you can print or save as PDF. A copy is also saved to your Google Drive folder named <em>Commission Reports</em> with the filename format: <em>Salesperson Name — Period, Year</em>.</p>
+    </div>
+    <div id="r-status"></div>
+  </div>
+
+  <!-- EDIT PERSON MODAL -->
+  <div id="edit-person-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:8px;padding:2rem;max-width:500px;width:90%;max-height:90vh;overflow-y:auto;">
+      <p style="font-size:1rem;font-weight:500;margin-bottom:1.25rem">Edit salesperson</p>
+      <input type="hidden" id="ep-id">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Full name</label>
+          <input type="text" id="ep-name">
+        </div>
+        <div class="form-group full">
+          <label>Email</label>
+          <input type="email" id="ep-email">
+        </div>
+        <div class="form-group">
+          <label>System type</label>
+          <select id="ep-type">
+            <option value="building">Building store</option>
+            <option value="wholesaler">Wholesaler</option>
+            <option value="spa">Spa store</option>
+            <option value="state_fair">State fair</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Reports</label>
+          <select id="ep-printonly">
+            <option value="false">Email + print</option>
+            <option value="true">Print only</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label style="display:flex;align-items:center;gap:0.5rem;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="ep-manager" style="width:auto;padding:0;border:none">
+            Sales manager (receives override commission report)
+          </label>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="saveEditPerson()">Save changes</button>
+        <button class="btn secondary" onclick="closeEditPerson()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const SUPA_URL = 'https://ydiqhjurqpepthhbjmnl.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkaXFoanVycXBlcHRoaGJqbW5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNzkzMjgsImV4cCI6MjA5MTc1NTMyOH0.ld0t8SMzCZ6wm30KP7X9mPPWezQ7OQm6QfhGXw-tnZU';
+const hdrs = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+
+const OVERRIDE_TYPES = ['deck','building','map','pool','wholesale'];
+const SPLIT_BASE_RATES = { deck: 0.025, building: 0.025, map: 0.06, pool: 0.04, spa: 0.08, wholesale: 0.10, chemical: 0.04, concrete: 0, state_fair: 0, other: 0 };
+
+async function db(method, table, body, query) {
+  const url = `${SUPA_URL}/rest/v1/${table}${query||''}`;
+  const res = await fetch(url, { method, headers: hdrs, body: body ? JSON.stringify(body) : undefined });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.message||'DB error'); }
+  return method === 'DELETE' ? null : res.json();
+}
+
+let salespeople = [], commRates = [];
+let editingId = null;
+
+function getPeriodLabel() {
+  const today = new Date(); const day = today.getDate();
+  const prev = new Date(today.getFullYear(), today.getMonth(), 0);
+  if (day <= 15) return `${prev.toLocaleString('default',{month:'long'})} 16–${prev.getDate()}`;
+  return `${today.toLocaleString('default',{month:'long'})} 1–15`;
+}
+
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'ledger') loadLedger();
+  if (id === 'people') loadPeople();
+  if (id === 'rates') loadRates();
+  if (id === 'dashboard') loadDashboard();
+  if (id === 'manager') loadManager();
+  if (id === 'reports') initReports();
+}
+
+function showMsg(msg, type) {
+  const el = document.getElementById('msg-global');
+  el.innerHTML = `<div class="msg ${type}">${msg}</div>`;
+  setTimeout(() => { el.innerHTML = ''; }, 4000);
+}
+
+function fmt(n) { return Number(n||0).toLocaleString('en-US',{style:'currency',currency:'USD'}); }
+function pct(n) { return (Number(n||0)*100).toFixed(2)+'%'; }
+
+async function loadSalespeople() {
+  salespeople = await db('GET','salespeople',null,'?order=name&select=*');
+  ['s-person','s-split','f-person','d-person','r-person'].forEach(id => {
+    const el = document.getElementById(id); if (!el) return;
+    const cur = el.value;
+    const isFilter = (id === 'f-person' || id === 'd-person');
+    const isSplit = id === 's-split';
+    el.innerHTML = isFilter ? '<option value="">All salespeople</option>' : isSplit ? '<option value="">None</option>' : '<option value="">Select...</option>';
+    salespeople.filter(p => p.active).forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.name; o.dataset.type = p.system_type;
+      el.appendChild(o);
+    });
+    if (cur) el.value = cur;
+  });
+}
+
+async function loadRates() {
+  commRates = await db('GET','commission_rates',null,'?order=min_sales');
+  const tbody = document.getElementById('rates-building');
+  tbody.innerHTML = commRates.filter(r => r.sale_type==='deck').map(r =>
+    `<tr><td>${fmt(r.min_sales)} – ${r.max_sales ? fmt(r.max_sales) : 'and above'}</td><td>${pct(r.rate)}</td></tr>`
+  ).join('');
+}
+
+async function getMonthlyTotal(personId) {
+  const now = new Date();
+  const start = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  // Primary sales — credit their percentage (default 50% if split, 100% if not)
+  const primary = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${start}&select=sale_price,split_salesperson_id,split_credit_pct`);
+  const primaryTotal = primary.reduce((s,r) => {
+    const creditPct = r.split_salesperson_id ? (r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5) : 1.0;
+    return s + Number(r.sale_price||0) * creditPct;
+  }, 0);
+  // Sales where this person is the split person — credit their portion (1 - primary credit)
+  const splitSales = await db('GET','sales',null,`?split_salesperson_id=eq.${personId}&date=gte.${start}&select=sale_price,split_credit_pct`);
+  const splitTotal = splitSales.reduce((s,r) => {
+    const primaryPct = r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5;
+    return s + Number(r.sale_price||0) * (1 - primaryPct);
+  }, 0);
+  return primaryTotal + splitTotal;
+}
+
+async function getSuggestedRate(personId, saleType) {
+  const person = salespeople.find(p => p.id === personId);
+  if (!person) return 0;
+  if (saleType === 'chemical') return 0.04;
+  if (saleType === 'map') return 0.06;
+  if (saleType === 'pool') return 0.04;
+  if (saleType === 'spa') return 0.08;
+  if (saleType === 'wholesale') return 0.10;
+  if (saleType === 'concrete' || saleType === 'other') return 0;
+  if ((saleType === 'deck' || saleType === 'building') && person.system_type === 'building') {
+    const monthly = await getMonthlyTotal(personId);
+    const tiers = commRates.filter(r => r.sale_type==='deck').sort((a,b) => a.min_sales - b.min_sales);
+    for (const tier of tiers) {
+      if (monthly >= tier.min_sales && (tier.max_sales === null || monthly <= tier.max_sales)) return tier.rate;
+    }
+  }
+  return 0;
+}
+
+function getSplitDefaultRate(saleType) {
+  return (SPLIT_BASE_RATES[saleType] || 0) / 2;
+}
+
+async function onPersonChange() { await calcCommission(); }
+async function onTypeChange() {
+  document.getElementById('s-rate').value = '';
+  await calcCommission();
+  const saleType = document.getElementById('s-type').value;
+  const splitRateEl = document.getElementById('s-splitrate');
+  const splitDefault = getSplitDefaultRate(saleType);
+  splitRateEl.placeholder = splitDefault > 0 ? `Auto (${(splitDefault*100).toFixed(2)}%)` : 'Auto';
+}
+
+async function calcCommission() {
+  const personId = document.getElementById('s-person').value;
+  const saleType = document.getElementById('s-type').value;
+  const par = parseFloat(document.getElementById('s-par').value) || 0;
+  const overage = parseFloat(document.getElementById('s-overage').value) || 0;
+  const hasSplit = !!document.getElementById('s-split').value;
+  const spiff = parseFloat(document.getElementById('s-spiff').value) || 0;
+
+  if (!personId || !saleType || !par) { document.getElementById('calc-preview').style.display='none'; return; }
+
+  let rateInput = parseFloat(document.getElementById('s-rate').value);
+  if (!rateInput && rateInput !== 0) {
+    const suggested = await getSuggestedRate(personId, saleType);
+    document.getElementById('s-rate').value = (suggested * 100).toFixed(2);
+    rateInput = suggested * 100;
+  }
+
+  const rate = rateInput / 100;
+  let commission = 0, ovrPortion = 0, ovrLabel = '';
+
+  if (saleType === 'concrete') {
+    ovrPortion = overage * (hasSplit ? 0.25 : 0.5); ovrLabel = hasSplit ? '25% (split)' : '50%';
+  } else if (saleType === 'wholesale') {
+    commission = par * rate; ovrPortion = overage * (hasSplit ? 0.5 : 1.0); ovrLabel = hasSplit ? '50% (split)' : '100%';
+  } else {
+    commission = par * rate; ovrPortion = overage * (hasSplit ? 0.25 : 0.5); ovrLabel = hasSplit ? '25% (split)' : '50%';
+  }
+
+  document.getElementById('s-commission').value = commission.toFixed(2);
+
+  const splitDefaultRate = getSplitDefaultRate(saleType);
+  const splitSpiff = hasSplit ? spiff * 0.5 : 0;
+
+  const managerOverride = OVERRIDE_TYPES.includes(saleType) ? par * 0.015 : 0;
+
+  const preview = document.getElementById('calc-preview');
+  preview.style.display = 'block';
+  preview.innerHTML = `
+    <div class="calc-row"><span>Par price</span><span>${fmt(par)}</span></div>
+    <div class="calc-row"><span>Rate</span><span>${(rate*100).toFixed(2)}%</span></div>
+    ${saleType !== 'concrete' ? `<div class="calc-row"><span>Commission (par × rate)</span><span>${fmt(commission)}</span></div>` : ''}
+    ${overage > 0 ? `<div class="calc-row"><span>Overage portion (${ovrLabel})</span><span>${fmt(ovrPortion)}</span></div>` : ''}
+    ${spiff > 0 ? `<div class="calc-row"><span>Spiff${hasSplit ? ' (primary 50%)' : ''}</span><span>${fmt(hasSplit ? spiff*0.5 : spiff)}</span></div>` : ''}
+    <div class="calc-row total"><span>Total payable to ${hasSplit ? 'primary' : 'salesperson'}</span><span>${fmt(commission + ovrPortion + (hasSplit ? spiff*0.5 : spiff))}</span></div>
+    ${hasSplit ? `<div class="calc-row" style="font-size:0.8rem;color:#888"><span>Split person — rate: ${(splitDefaultRate*100).toFixed(2)}% | overage: ${fmt(ovrPortion)}${spiff>0?' | spiff: '+fmt(splitSpiff):''}</span><span></span></div>` : ''}
+    ${managerOverride > 0 ? `<div class="calc-row" style="font-size:0.8rem;color:#888;margin-top:0.5rem"><span>Manager override (1.5% of par)</span><span>${fmt(managerOverride)}</span></div>` : ''}
+  `;
+}
+
+async function saveSale() {
+  const personId = document.getElementById('s-person').value;
+  const saleType = document.getElementById('s-type').value;
+  const date = document.getElementById('s-date').value;
+  if (!personId || !saleType || !date) { showMsg('Please fill in date, salesperson, and sale type.','error'); return; }
+  const splitId = document.getElementById('s-split').value;
+  const overage = parseFloat(document.getElementById('s-overage').value) || 0;
+  const spiff = parseFloat(document.getElementById('s-spiff').value) || 0;
+  const splitDefaultRate = getSplitDefaultRate(saleType);
+  const payload = {
+    date, salesperson_id: personId,
+    customer_name: document.getElementById('s-customer').value,
+    product: document.getElementById('s-product').value,
+    sale_type: saleType,
+    par_price: parseFloat(document.getElementById('s-par').value) || 0,
+    sale_price: parseFloat(document.getElementById('s-saleprice').value) || 0,
+    rate: (parseFloat(document.getElementById('s-rate').value) || 0) / 100,
+    commission_amount: parseFloat(document.getElementById('s-commission').value) || 0,
+    pd_commission: document.getElementById('s-pdcomm').value || null,
+    overage, pd_overage: document.getElementById('s-pdovg').value || null,
+    spiff,
+    split_salesperson_id: splitId || null,
+    split_rate: splitId ? ((parseFloat(document.getElementById('s-splitrate').value) || splitDefaultRate*100) / 100) : null,
+    split_overage_amount: splitId ? (parseFloat(document.getElementById('s-splitovg').value) || overage * (saleType==='wholesale'?0.5:0.25)) : null,
+    split_spiff_amount: splitId ? (parseFloat(document.getElementById('s-splitspiff').value) || spiff * 0.5) : null,
+    split_credit_pct: splitId ? ((parseFloat(document.getElementById('s-creditpct').value) || 50) / 100) : null,
+    notes: document.getElementById('s-notes').value || null
+  };
+  try {
+    if (editingId) {
+      await db('PATCH','sales',payload,`?id=eq.${editingId}`);
+      showMsg('Sale updated successfully.','success');
+    } else {
+      await db('POST','sales',payload);
+      showMsg('Sale saved successfully.','success');
+    }
+    clearSaleForm();
+  } catch(e) { showMsg('Error saving sale: '+e.message,'error'); }
+}
+
+function clearSaleForm() {
+  ['s-customer','s-product','s-par','s-saleprice','s-rate','s-commission','s-splitrate','s-splitspiff','s-creditpct','s-notes'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('s-overage').value = '0';
+  document.getElementById('s-spiff').value = '0';
+  document.getElementById('s-pdcomm').value = '';
+  document.getElementById('s-pdovg').value = '';
+  document.getElementById('s-split').value = '';
+  document.getElementById('s-splitovg').value = '';
+  document.getElementById('calc-preview').style.display = 'none';
+  editingId = null;
+  document.getElementById('save-btn').textContent = 'Save sale';
+  document.getElementById('cancel-edit-btn').style.display = 'none';
+  document.getElementById('sale-form-title').textContent = 'Log a sale';
+  document.getElementById('sale-form-sub').textContent = 'Commission is calculated automatically based on salesperson type and monthly totals.';
+}
+
+async function editSale(r) {
+  editingId = r.id;
+  showSection('sales', document.querySelector('nav button'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.querySelector('nav button').classList.add('active');
+  document.getElementById('sale-form-title').textContent = 'Edit sale';
+  document.getElementById('sale-form-sub').textContent = `Editing sale for ${r.customer_name||'unknown customer'} — changes will overwrite the existing record.`;
+  document.getElementById('save-btn').textContent = 'Update sale';
+  document.getElementById('cancel-edit-btn').style.display = '';
+  // Populate fields
+  document.getElementById('s-date').value = r.date;
+  document.getElementById('s-person').value = r.salesperson_id;
+  document.getElementById('s-type').value = r.sale_type;
+  document.getElementById('s-customer').value = r.customer_name || '';
+  document.getElementById('s-product').value = r.product || '';
+  document.getElementById('s-par').value = r.par_price || '';
+  document.getElementById('s-saleprice').value = r.sale_price || '';
+  document.getElementById('s-rate').value = r.rate ? (r.rate * 100).toFixed(2) : '';
+  document.getElementById('s-commission').value = r.commission_amount || '';
+  document.getElementById('s-pdcomm').value = r.pd_commission || '';
+  document.getElementById('s-overage').value = r.overage || 0;
+  document.getElementById('s-pdovg').value = r.pd_overage || '';
+  document.getElementById('s-spiff').value = r.spiff || 0;
+  document.getElementById('s-split').value = r.split_salesperson_id || '';
+  document.getElementById('s-splitrate').value = r.split_rate ? (r.split_rate * 100).toFixed(2) : '';
+  document.getElementById('s-splitovg').value = r.split_overage_amount || '';
+  document.getElementById('s-splitspiff').value = r.split_spiff_amount || '';
+  document.getElementById('s-creditpct').value = r.split_credit_pct ? (r.split_credit_pct * 100) : '';
+  document.getElementById('s-notes').value = r.notes || '';
+  window.scrollTo(0,0);
+  await calcCommission();
+}
+
+async function loadLedger() {
+  const personFilter = document.getElementById('f-person').value;
+  const statusFilter = document.getElementById('f-status').value;
+  let query = '?select=*,salesperson:salespeople!salesperson_id(name),split:salespeople!split_salesperson_id(name)&order=date.desc';
+  if (personFilter) query += `&salesperson_id=eq.${personFilter}`;
+  const rows = await db('GET','sales',null,query);
+  const filtered = statusFilter === 'open'
+    ? rows.filter(r => {
+        const commPaid = r.pd_commission && r.pd_commission !== 'X';
+        const ovgPaid = r.pd_overage && r.pd_overage !== 'X';
+        const hasOvg = r.overage > 0;
+        if (hasOvg) return !(commPaid && ovgPaid);
+        return !commPaid;
+      })
+    : rows;
+  const tbody = document.getElementById('ledger-body');
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state">No records found.</td></tr>'; return; }
+  tbody.innerHTML = filtered.map(r => {
+    const cs = !r.pd_commission ? `<span class="status-empty" title="Click to approve">—</span>`
+      : r.pd_commission==='X' ? `<span class="status-x" title="Click to stamp date or remove">X</span>`
+      : `<span class="status-paid" title="Click to undo">${r.pd_commission}</span>`;
+    const os = !r.pd_overage ? `<span class="status-empty" title="Click to approve">—</span>`
+      : r.pd_overage==='X' ? `<span class="status-x" title="Click to stamp date or remove">X</span>`
+      : `<span class="status-paid" title="Click to undo">${r.pd_overage}</span>`;
+    const splitInfo = r.split?.name ? `<span style="font-size:0.78rem;color:#888">${r.split.name}</span>` : '—';
+    return `<tr>
+      <td style="white-space:nowrap">${r.date}</td>
+      <td>${r.salesperson?.name||'—'}</td>
+      <td>${r.customer_name||'—'}</td>
+      <td style="font-size:0.8rem">${r.product||'—'}</td>
+      <td><span class="badge ${r.sale_type}">${r.sale_type.replace('_',' ')}</span></td>
+      <td>${fmt(r.par_price)}</td>
+      <td>${r.rate > 0 ? pct(r.rate) : '—'}</td>
+      <td>${fmt(r.commission_amount)}</td>
+      <td style="cursor:pointer" onclick="toggleField('${r.id}','pd_commission','${r.pd_commission||''}')">${cs}</td>
+      <td>${fmt(r.overage)}</td>
+      <td style="cursor:pointer" onclick="toggleField('${r.id}','pd_overage','${r.pd_overage||''}')">${os}</td>
+      <td>${r.spiff > 0 ? fmt(r.spiff) : '—'}</td>
+      <td>${splitInfo}</td>
+      <td style="white-space:nowrap">
+        <button class="btn small secondary" onclick="markBothPaid('${r.id}',${r.overage>0})">Mark paid</button>
+        <button class="btn small secondary" style="margin-left:4px" onclick="editSale(${JSON.stringify(r).replace(/"/g,'&quot;')})">Edit</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function toggleField(id, field, current) {
+  if (current && current !== 'X') {
+    if (!confirm(`Marked as "${current}". Click OK to undo and clear back to unpaid.`)) return;
+    await db('PATCH','sales',{[field]:null},`?id=eq.${id}`);
+    loadLedger(); return;
+  }
+  if (current === 'X') {
+    const val = prompt('Enter pay period date (e.g. 4/15/26), or leave blank to remove the X:');
+    if (val === null) return;
+    await db('PATCH','sales',{[field]: val.trim() || null},`?id=eq.${id}`);
+    loadLedger(); return;
+  }
+  await db('PATCH','sales',{[field]:'X'},`?id=eq.${id}`);
+  loadLedger();
+}
+
+async function markBothPaid(id, hasOverage) {
+  const period = prompt('Enter pay period date (e.g. 4/15/26):');
+  if (!period||!period.trim()) return;
+  const update = { pd_commission: period.trim() };
+  if (hasOverage) update.pd_overage = period.trim();
+  await db('PATCH','sales',update,`?id=eq.${id}`);
+  loadLedger();
+}
+
+async function markAllXPaid() {
+  const period = prompt('Enter pay period date to stamp all X-approved items (e.g. 4/15/26):');
+  if (!period||!period.trim()) return;
+  const val = period.trim();
+  await db('PATCH','sales',{pd_commission:val},'?pd_commission=eq.X');
+  await db('PATCH','sales',{pd_overage:val},'?pd_overage=eq.X');
+  showMsg(`All approved items stamped as paid for ${val}.`,'success');
+  loadLedger();
+}
+
+async function loadDashboard() {
+  const personId = document.getElementById('d-person').value;
+  const content = document.getElementById('dashboard-content');
+  if (!personId) { content.innerHTML = '<div class="card"><p style="color:#888;text-align:center;padding:2rem">Select a salesperson to view their dashboard.</p></div>'; return; }
+  const person = salespeople.find(p => p.id === personId);
+  const year = new Date().getFullYear();
+  const rows = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${year}-01-01&select=*&order=date`);
+  const now = new Date(); const curMonth = now.getMonth();
+
+  // monthly totals
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthData = Array.from({length:12},(_,i) => ({ name: monthNames[i], sales:0, commission:0, overage:0, spiff:0, paid:0 }));
+  rows.forEach(r => {
+    const m = new Date(r.date).getMonth();
+    monthData[m].sales += Number(r.sale_price||0);
+    monthData[m].commission += Number(r.commission_amount||0);
+    monthData[m].overage += Number(r.overage||0);
+    monthData[m].spiff += Number(r.spiff||0);
+    if (r.pd_commission && r.pd_commission !== 'X') monthData[m].paid += Number(r.commission_amount||0);
+    if (r.pd_overage && r.pd_overage !== 'X') monthData[m].paid += Number(r.overage * (r.sale_type==='wholesale'?1:0.5)||0);
+  });
+
+  const mtdSales = monthData[curMonth].sales;
+  const tiers = commRates.filter(r => r.sale_type==='deck').sort((a,b) => a.min_sales-b.min_sales);
+  let curTier = null;
+  if (person.system_type === 'building') {
+    for (const tier of tiers) {
+      if (mtdSales >= tier.min_sales && (tier.max_sales===null||mtdSales<=tier.max_sales)) curTier = tier;
+    }
+  }
+
+  const outstanding = rows.filter(r => {
+    const hasOvg = r.overage > 0;
+    const commPaid = r.pd_commission && r.pd_commission !== 'X';
+    const ovgPaid = r.pd_overage && r.pd_overage !== 'X';
+    if (hasOvg) return !(commPaid && ovgPaid);
+    return !commPaid;
+  }).reduce((s,r) => {
+    if (!r.pd_commission||r.pd_commission==='X') s += Number(r.commission_amount||0);
+    if (r.overage > 0 && (!r.pd_overage||r.pd_overage==='X')) s += Number(r.overage*(r.sale_type==='wholesale'?1:0.5)||0);
+    return s;
+  }, 0);
+
+  const totalSales = rows.reduce((s,r) => s+Number(r.sale_price||0),0);
+  const activeMths = monthData.filter(m => m.sales > 0).length || 1;
+  const avgMonthly = totalSales / activeMths;
+
+  content.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">MTD sales</div><div class="stat-value">${fmt(mtdSales)}</div></div>
+      <div class="stat-card"><div class="stat-label">Current tier</div><div class="stat-value">${curTier ? `<span class="tier-badge">${pct(curTier.rate)}</span>` : person.system_type==='building'?'<span class="tier-badge">2.5%</span>':'<span style="color:#888;font-size:0.9rem">N/A</span>'}</div></div>
+      <div class="stat-card"><div class="stat-label">Monthly average</div><div class="stat-value">${fmt(avgMonthly)}</div><div class="stat-sub">${activeMths} active month${activeMths!==1?'s':''}</div></div>
+      <div class="stat-card"><div class="stat-label">Total outstanding</div><div class="stat-value">${fmt(outstanding)}</div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="month-table">
+        <thead><tr><th>Month</th><th>Sales total</th><th>Commission earned</th><th>Overage earned</th><th>Spiffs</th><th>Total paid</th></tr></thead>
+        <tbody>
+          ${monthData.map((m,i) => i > curMonth ? '' : `<tr${i===curMonth?' style="font-weight:500"':''}>
+            <td>${m.name}</td>
+            <td>${m.sales>0?fmt(m.sales):'—'}</td>
+            <td>${m.commission>0?fmt(m.commission):'—'}</td>
+            <td>${m.overage>0?fmt(m.overage):'—'}</td>
+            <td>${m.spiff>0?fmt(m.spiff):'—'}</td>
+            <td>${m.paid>0?fmt(m.paid):'—'}</td>
+          </tr>`).join('')}
+          <tr style="border-top:1px solid #e0ddd8;font-weight:500">
+            <td>YTD total</td>
+            <td>${fmt(monthData.reduce((s,m)=>s+m.sales,0))}</td>
+            <td>${fmt(monthData.reduce((s,m)=>s+m.commission,0))}</td>
+            <td>${fmt(monthData.reduce((s,m)=>s+m.overage,0))}</td>
+            <td>${fmt(monthData.reduce((s,m)=>s+m.spiff,0))}</td>
+            <td>${fmt(monthData.reduce((s,m)=>s+m.paid,0))}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function loadManager() {
+  const monthVal = parseInt(document.getElementById('m-month').value);
+  const year = new Date().getFullYear();
+  const monthStr = String(monthVal+1).padStart(2,'0');
+  const start = `${year}-${monthStr}-01`;
+  const lastDay = new Date(year, monthVal+1, 0).getDate();
+  const end = `${year}-${monthStr}-${lastDay}`;
+  const monthName = new Date(year,monthVal,1).toLocaleString('default',{month:'long'});
+
+  const rows = await db('GET','sales',null,
+    `?select=*,salesperson:salespeople!salesperson_id(name)&date=gte.${start}&date=lte.${end}&sale_type=in.(${OVERRIDE_TYPES.join(',')})&order=date`);
+
+  const total = rows.reduce((s,r) => s + Number(r.par_price||0)*0.015, 0);
+  const content = document.getElementById('manager-content');
+
+  if (!rows.length) {
+    content.innerHTML = `<div class="card"><p style="color:#888;text-align:center;padding:2rem">No qualifying sales found for ${monthName} ${year}.</p></div>`;
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Override total — ${monthName}</div><div class="stat-value">${fmt(total)}</div><div class="stat-sub">${rows.length} qualifying sale${rows.length!==1?'s':''}</div></div>
+      <div class="stat-card"><div class="stat-label">Total par (qualifying)</div><div class="stat-value">${fmt(rows.reduce((s,r)=>s+Number(r.par_price||0),0))}</div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr><th>Date</th><th>Salesperson</th><th>Customer</th><th>Product</th><th>Type</th><th>Par price</th><th>Rate</th><th>Override</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr>
+            <td>${r.date}</td>
+            <td>${r.salesperson?.name||'—'}</td>
+            <td>${r.customer_name||'—'}</td>
+            <td style="font-size:0.8rem">${r.product||'—'}</td>
+            <td><span class="badge ${r.sale_type}">${r.sale_type.replace('_',' ')}</span></td>
+            <td>${fmt(r.par_price)}</td>
+            <td>1.5%</td>
+            <td style="font-weight:500">${fmt(Number(r.par_price)*0.015)}</td>
+          </tr>`).join('')}
+          <tr style="font-weight:500;border-top:1px solid #e0ddd8">
+            <td colspan="7" style="text-align:right">Total override for ${monthName}</td>
+            <td>${fmt(total)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function savePerson() {
+  const name = document.getElementById('p-name').value.trim();
+  if (!name) { showMsg('Name is required.','error'); return; }
+  const payload = { name, email: document.getElementById('p-email').value.trim()||null, system_type: document.getElementById('p-type').value, print_only: document.getElementById('p-printonly').value==='true', is_sales_manager: document.getElementById('p-manager').checked, active: true };
+  try {
+    await db('POST','salespeople',payload);
+    document.getElementById('p-name').value = '';
+    document.getElementById('p-email').value = '';
+    await loadSalespeople(); loadPeople();
+    showMsg(`${name} added successfully.`,'success');
+  } catch(e) { showMsg('Error: '+e.message,'error'); }
+}
+
+async function loadPeople() {
+  const rows = await db('GET','salespeople',null,'?order=name');
+  const tbody = document.getElementById('people-body');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No salespeople added yet.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(p => `<tr>
+    <td style="font-weight:500">${p.name}</td>
+    <td><span class="badge ${p.system_type}">${p.system_type.replace('_',' ')}</span></td>
+    <td style="font-size:0.82rem;color:#888">${p.email||'—'}</td>
+    <td style="font-size:0.82rem">${p.print_only?'Print only':'Email + print'}</td>
+    <td style="font-size:0.82rem">${p.is_sales_manager?'<span style="color:#1a7a4a;font-weight:500">Yes</span>':'—'}</td>
+    <td><span class="badge ${p.active?'active':'inactive'}">${p.active?'Active':'Inactive'}</span></td>
+    <td style="white-space:nowrap">
+      <button class="btn small secondary" onclick="openEditPerson(${JSON.stringify(p).replace(/"/g,'&quot;')})">Edit</button>
+      <button class="btn small ${p.active?'danger':'secondary'}" style="margin-left:4px" onclick="toggleActive('${p.id}',${p.active})">${p.active?'Deactivate':'Reactivate'}</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function toggleActive(id, current) {
+  await db('PATCH','salespeople',{active:!current},`?id=eq.${id}`);
+  await loadSalespeople(); loadPeople();
+}
+
+
+function initReports() {
+  const el = document.getElementById('r-period');
+  if (!el.value) el.value = getPeriodLabel() + ', ' + new Date().getFullYear();
+}
+
+function buildReportHTML(person, sales, period, overrides) {
+  const isMgr = person.is_sales_manager;
+  const ovgMultiplier = (type) => type === 'wholesale' ? 1 : 0.5;
+
+  const commPaidTotal = sales.reduce((s,r) => r.pd_commission==='X' ? s+Number(r.commission_amount||0) : s, 0);
+  const ovgPaidTotal = sales.reduce((s,r) => r.pd_overage==='X' ? s+Number(r.overage||0)*ovgMultiplier(r.sale_type) : s, 0);
+  const spiffPaidTotal = sales.reduce((s,r) => r.pd_commission==='X' ? s+Number(r.spiff||0) : s, 0);
+  const totalPaid = commPaidTotal + ovgPaidTotal + spiffPaidTotal;
+
+  const overrideTotal = overrides ? overrides.reduce((s,r) => s+Number(r.par_price||0)*0.015, 0) : 0;
+
+  const rows = sales.map(r => {
+    const splitName = r.split?.name || '';
+    return `<tr>
+      <td>${r.date}</td>
+      <td>${r.customer_name||''}</td>
+      <td>${r.product||''}</td>
+      <td>${fmtR(r.par_price)}</td>
+      <td>${r.rate > 0 ? pctR(r.rate) : '—'}</td>
+      <td>${fmtR(r.commission_amount)}</td>
+      <td style="color:${r.pd_commission==='X'?'#c0392b':'#1a7a4a'}">${r.pd_commission||''}</td>
+      <td>${r.overage > 0 ? fmtR(r.overage*ovgMultiplier(r.sale_type)) : ''}</td>
+      <td style="color:${r.pd_overage==='X'?'#c0392b':'#1a7a4a'}">${r.pd_overage||''}</td>
+      <td>${r.spiff > 0 ? fmtR(r.spiff) : ''}</td>
+      <td>${splitName}</td>
+    </tr>`;
+  }).join('');
+
+  const overrideRows = overrides ? overrides.map(r => `<tr>
+    <td>${r.date}</td>
+    <td>${r.salesperson?.name||''}</td>
+    <td>${r.customer_name||''}</td>
+    <td>${r.product||''}</td>
+    <td>${fmtR(r.par_price)}</td>
+    <td>1.5%</td>
+    <td>${fmtR(Number(r.par_price)*0.015)}</td>
+  </tr>`).join('') : '';
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>${person.name} — ${period}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; padding: 1.5cm; }
+    h2 { font-size: 13pt; font-weight: bold; margin-bottom: 2px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+    .header-left h2 { font-size: 14pt; }
+    .header-left p { font-size: 10pt; color: #555; margin-top: 3px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9.5pt; }
+    th { text-align: left; padding: 5px 6px; border-bottom: 1.5px solid #000; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 5px 6px; border-bottom: 0.5px solid #ddd; vertical-align: top; }
+    .totals { margin-top: 8px; float: right; width: 240px; }
+    .totals table { font-size: 10pt; }
+    .totals td { padding: 4px 6px; border: none; }
+    .totals tr.total-row td { border-top: 1.5px solid #000; font-weight: bold; padding-top: 6px; }
+    .section-title { font-size: 10pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 8px; border-bottom: 1px solid #aaa; padding-bottom: 4px; }
+    .clearfix::after { content: ""; display: table; clear: both; }
+    @media print { body { padding: 1cm; } }
+  </style></head><body>
+  <div class="header">
+    <div class="header-left">
+      <h2>${person.name}</h2>
+      <p>${period}</p>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Date</th><th>Customer</th><th>Product</th><th>Sale</th><th>Rate</th><th>Commission</th><th>Comm Paid</th><th>Overage</th><th>Ovg Paid</th><th>Spiff</th><th>Split</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div class="clearfix">
+    <div class="totals">
+      <table>
+        <tr><td>Commission Paid</td><td style="text-align:right">${fmtR(commPaidTotal)}</td></tr>
+        <tr><td>Overage Paid</td><td style="text-align:right">${fmtR(ovgPaidTotal)}</td></tr>
+        <tr><td>Spiff Paid</td><td style="text-align:right">${fmtR(spiffPaidTotal)}</td></tr>
+        <tr class="total-row"><td>Total Paid</td><td style="text-align:right">${fmtR(totalPaid)}</td></tr>
+        ${isMgr && overrides ? `<tr><td style="padding-top:12px">Override Commission</td><td style="text-align:right;padding-top:12px">${fmtR(overrideTotal)}</td></tr>
+        <tr class="total-row"><td>Total + Override</td><td style="text-align:right">${fmtR(totalPaid+overrideTotal)}</td></tr>` : ''}
+      </table>
+    </div>
+  </div>
+
+  ${isMgr && overrides && overrides.length > 0 ? `
+  <div class="section-title">Override Commission Detail</div>
+  <table>
+    <thead><tr><th>Date</th><th>Salesperson</th><th>Customer</th><th>Product</th><th>Price</th><th>Rate</th><th>Commission</th></tr></thead>
+    <tbody>${overrideRows}</tbody>
+    <tfoot><tr><td colspan="6" style="text-align:right;font-weight:bold;padding-top:8px;border-top:1.5px solid #000">Total Override</td><td style="font-weight:bold;padding-top:8px;border-top:1.5px solid #000">${fmtR(overrideTotal)}</td></tr></tfoot>
+  </table>` : ''}
+
+  </body></html>`;
+}
+
+function fmtR(n) { return Number(n||0).toLocaleString('en-US',{style:'currency',currency:'USD'}); }
+function pctR(n) { return (Number(n||0)*100).toFixed(2)+'%'; }
+
+async function getReportData(personId, period) {
+  const sales = await db('GET','sales',null,
+    `?salesperson_id=eq.${personId}&select=*,split:salespeople!split_salesperson_id(name)&order=date`);
+  const open = sales.filter(r => {
+    const commPaid = r.pd_commission && r.pd_commission !== 'X';
+    const ovgPaid = r.pd_overage && r.pd_overage !== 'X';
+    const hasOvg = r.overage > 0;
+    if (hasOvg) return !(commPaid && ovgPaid);
+    return !commPaid;
+  });
+  return open;
+}
+
+async function getOverrideData(period) {
+  const year = new Date().getFullYear();
+  const rows = await db('GET','sales',null,
+    `?select=*,salesperson:salespeople!salesperson_id(name)&sale_type=in.(${OVERRIDE_TYPES.join(',')})&order=date`);
+  return rows;
+}
+
+// ── Gmail helpers ──────────────────────────────────────────
+function b64url(str) {
+  return btoa(unescape(encodeURIComponent(str)))
+    .replace(/[+]/g,'-').replace(/[/]/g,'_').replace(/=+$/,'');
+}
+
+function buildMimeMessage(to, subject, bodyText, attachmentHtml, attachmentFilename) {
+  const boundary = 'BOUNDARY_' + Math.random().toString(36).slice(2);
+  const mime = [
+    'MIME-Version: 1.0',
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset=UTF-8',
+    '',
+    bodyText,
+    '',
+    `--${boundary}`,
+    `Content-Type: text/html; name="${attachmentFilename}"`,
+    'Content-Transfer-Encoding: base64',
+    `Content-Disposition: attachment; filename="${attachmentFilename}"`,
+    '',
+    btoa(unescape(encodeURIComponent(attachmentHtml))),
+    '',
+    `--${boundary}--`
+  ].join('\r\n');
+  return b64url(mime);
+}
+
+async function sendGmail(to, subject, bodyText, attachmentHtml, attachmentFilename) {
+  try {
+    const raw = buildMimeMessage(to, subject, bodyText, attachmentHtml, attachmentFilename);
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw }),
+      credentials: 'include'
+    });
+    return res.ok;
+  } catch(e) {
+    console.error('Gmail send failed:', e);
+    return false;
+  }
+}
+
+// ── Google Drive helpers ────────────────────────────────────
+async function saveToDrive(htmlContent, filename) {
+  try {
+    const folderName = 'Commission Reports';
+    // Find or create folder
+    let folderId = null;
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`,
+      { credentials: 'include' }
+    );
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      if (data.files && data.files.length > 0) {
+        folderId = data.files[0].id;
+      } else {
+        const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder' })
+        });
+        if (createRes.ok) { const f = await createRes.json(); folderId = f.id; }
+      }
+    }
+    // Upload file
+    const meta = { name: filename + '.html', mimeType: 'text/html', parents: folderId ? [folderId] : [] };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
+    form.append('file', new Blob([htmlContent], {type:'text/html'}));
+    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST', body: form, credentials: 'include'
+    });
+    return uploadRes.ok;
+  } catch(e) {
+    console.error('Drive save failed:', e);
+    return false;
+  }
+}
+
+// ── Print helper ────────────────────────────────────────────
+function printReportWindow(html) {
+  return new Promise(resolve => {
+    const win = window.open('', '_blank');
+    if (!win) { resolve(false); return; }
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => {
+      setTimeout(() => { win.focus(); win.print(); resolve(true); }, 500);
+    };
+  });
+}
+
+// ── Core report delivery ────────────────────────────────────
+async function deliverReport(person, sales, period, overrides, statusEl) {
+  const html = buildReportHTML(person, sales, period, overrides);
+  const filename = `${person.name} — ${period}`;
+  const results = { printed: false, saved: false, emailed: false };
+
+  // Print 2 copies
+  results.printed = await printReportWindow(html);
+
+  // Save to Drive
+  results.saved = await saveToDrive(html, filename);
+
+  // Email (skip print-only)
+  if (!person.print_only && person.email) {
+    const subject = `Commission Report - ${period}`;
+    const body = `Dear ${person.name.split(' ')[0]},
+
+Your commission report for ${period} is attached. Please open the attached file to review your report for this period. Let me know if you have any questions.
+
+Thanks!`;
+    results.emailed = await sendGmail(person.email, subject, body, html, filename + '.html');
+  }
+
+  return results;
+}
+
+async function generateReport(personIdOverride) {
+  const period = document.getElementById('r-period').value.trim();
+  if (!period) { showMsg('Please enter a pay period label.','error'); return; }
+  const personId = personIdOverride || document.getElementById('r-person').value;
+  if (!personId) { showMsg('Please select a salesperson or use Generate All.','error'); return; }
+
+  const person = salespeople.find(p => p.id === personId);
+  if (!person) return;
+
+  const sales = await getReportData(personId, period);
+  let overrides = null;
+  if (person.is_sales_manager) overrides = await getOverrideData(period);
+
+  const statusEl = document.getElementById('r-status');
+  statusEl.innerHTML = `<div class="msg success">Generating report for ${person.name}...</div>`;
+
+  const results = await deliverReport(person, sales, period, overrides);
+
+  const parts = ['Report generated'];
+  if (results.delivered) {
+    parts.push('saved to Drive');
+    if (!person.print_only && person.email) parts.push('email sent');
+    else if (!person.email) parts.push('no email on file');
+  } else {
+    parts.push('Drive/email failed — check Apps Script');
+  }
+  statusEl.innerHTML = `<div class="msg success">${person.name}: ${parts.join(' · ')}.</div>`;
+}
+
+async function generateAllReports() {
+  const period = document.getElementById('r-period').value.trim();
+  if (!period) { showMsg('Please enter a pay period label.','error'); return; }
+
+  const statusEl = document.getElementById('r-status');
+  statusEl.innerHTML = '<div class="msg success">Generating reports — please wait...</div>';
+
+  const active = salespeople.filter(p => p.active);
+  let count = 0, emailed = 0, saved = 0;
+
+  for (const person of active) {
+    const sales = await getReportData(person.id, period);
+    if (sales.length === 0 && !person.is_sales_manager) continue;
+    let overrides = null;
+    if (person.is_sales_manager) overrides = await getOverrideData(period);
+
+    statusEl.innerHTML = `<div class="msg success">Generating ${count + 1}... ${person.name}</div>`;
+
+    const results = await deliverReport(person, sales, period, overrides);
+    if (results.delivered) saved++;
+    if (results.delivered && !person.print_only && person.email) emailed++;
+    count++;
+
+    await new Promise(r => setTimeout(r, 600));
+  }
+
+  statusEl.innerHTML = `<div class="msg success">Done. ${count} report${count!==1?'s':''} generated · ${saved} saved to Drive · ${emailed} emailed.</div>`;
+}
+
+function openEditPerson(p) {
+  document.getElementById('ep-id').value = p.id;
+  document.getElementById('ep-name').value = p.name;
+  document.getElementById('ep-email').value = p.email || '';
+  document.getElementById('ep-type').value = p.system_type;
+  document.getElementById('ep-printonly').value = p.print_only ? 'true' : 'false';
+  document.getElementById('ep-manager').checked = !!p.is_sales_manager;
+  const modal = document.getElementById('edit-person-modal');
+  modal.style.display = 'flex';
+}
+
+function closeEditPerson() {
+  document.getElementById('edit-person-modal').style.display = 'none';
+}
+
+async function saveEditPerson() {
+  const id = document.getElementById('ep-id').value;
+  const payload = {
+    name: document.getElementById('ep-name').value.trim(),
+    email: document.getElementById('ep-email').value.trim() || null,
+    system_type: document.getElementById('ep-type').value,
+    print_only: document.getElementById('ep-printonly').value === 'true',
+    is_sales_manager: document.getElementById('ep-manager').checked
+  };
+  try {
+    await db('PATCH','salespeople',payload,`?id=eq.${id}`);
+    closeEditPerson();
+    await loadSalespeople();
+    loadPeople();
+    showMsg('Salesperson updated.','success');
+  } catch(e) { showMsg('Error: '+e.message,'error'); }
+}
+
+async function init() {
+  document.getElementById('period-display').textContent = getPeriodLabel();
+  document.getElementById('s-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('m-month').value = new Date().getMonth();
+  await loadSalespeople();
+  await loadRates();
+}
+
+init();
+</script>
+</body>
+</html>
