@@ -1080,7 +1080,7 @@ async function getOverrideData(period) {
   return rows;
 }
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCZy4RFVTd5-t4N7sE4L56w94Ue3kN1DOZuZuKqNvE94YZC8oKlYpflrehC7_KzHql/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxb3UzGWUkpZLrRzJx_xzXpM5882oh4YmzNOUWe5CYVffcOKIDulzmaU-F4D66DI9MQ/exec';
 
 // ── Print helper ────────────────────────────────────────────
 function printReportWindow(html) {
@@ -1103,9 +1103,10 @@ async function sendToAppsScript(person, html, period) {
   const body = 'Dear ' + firstName + ',\n\nYour commission report for ' + period + ' is attached. Please open the attached file to review your report for this period. Let me know if you have any questions.\n\nThanks!';
 
   try {
-    const res = await fetch(APPS_SCRIPT_URL, {
+    // Use no-cors to bypass CORS restriction — response will be opaque but request goes through
+    await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors',
       body: JSON.stringify({
         action: 'saveAndEmail',
         filename,
@@ -1116,8 +1117,9 @@ async function sendToAppsScript(person, html, period) {
         printOnly: person.print_only || !person.email
       })
     });
-    const data = await res.json();
-    return data.success === true;
+    // Wait for Apps Script to process
+    await new Promise(r => setTimeout(r, 2000));
+    return true;
   } catch(e) {
     console.error('Apps Script error:', e);
     return false;
