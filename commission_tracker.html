@@ -1080,91 +1080,7 @@ async function getOverrideData(period) {
   return rows;
 }
 
-// ── Gmail helpers ──────────────────────────────────────────
-function b64url(str) {
-  return btoa(unescape(encodeURIComponent(str)))
-    .replace(/[+]/g,'-').replace(/[/]/g,'_').replace(/=+$/,'');
-}
-
-function buildMimeMessage(to, subject, bodyText, attachmentHtml, attachmentFilename) {
-  const boundary = 'BOUNDARY_' + Math.random().toString(36).slice(2);
-  const mime = [
-    'MIME-Version: 1.0',
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/plain; charset=UTF-8',
-    '',
-    bodyText,
-    '',
-    `--${boundary}`,
-    `Content-Type: text/html; name="${attachmentFilename}"`,
-    'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="${attachmentFilename}"`,
-    '',
-    btoa(unescape(encodeURIComponent(attachmentHtml))),
-    '',
-    `--${boundary}--`
-  ].join('\r\n');
-  return b64url(mime);
-}
-
-async function sendGmail(to, subject, bodyText, attachmentHtml, attachmentFilename) {
-  try {
-    const raw = buildMimeMessage(to, subject, bodyText, attachmentHtml, attachmentFilename);
-    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raw }),
-      credentials: 'include'
-    });
-    return res.ok;
-  } catch(e) {
-    console.error('Gmail send failed:', e);
-    return false;
-  }
-}
-
-// ── Google Drive helpers ────────────────────────────────────
-async function saveToDrive(htmlContent, filename) {
-  try {
-    const folderName = 'Commission Reports';
-    // Find or create folder
-    let folderId = null;
-    const searchRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`,
-      { credentials: 'include' }
-    );
-    if (searchRes.ok) {
-      const data = await searchRes.json();
-      if (data.files && data.files.length > 0) {
-        folderId = data.files[0].id;
-      } else {
-        const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder' })
-        });
-        if (createRes.ok) { const f = await createRes.json(); folderId = f.id; }
-      }
-    }
-    // Upload file
-    const meta = { name: filename + '.html', mimeType: 'text/html', parents: folderId ? [folderId] : [] };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
-    form.append('file', new Blob([htmlContent], {type:'text/html'}));
-    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST', body: form, credentials: 'include'
-    });
-    return uploadRes.ok;
-  } catch(e) {
-    console.error('Drive save failed:', e);
-    return false;
-  }
-}
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcECJ1ApH5GLixCMKo2OWA5ZU9fTkerfKjp3wkpmUmgqlyQOhcvEJ_mgkyjAayxfRL/exec';
 
 // ── Print helper ────────────────────────────────────────────
 function printReportWindow(html) {
@@ -1179,28 +1095,42 @@ function printReportWindow(html) {
   });
 }
 
-// ── Core report delivery ────────────────────────────────────
-async function deliverReport(person, sales, period, overrides, statusEl) {
-  const html = buildReportHTML(person, sales, period, overrides);
-  const filename = `${person.name} — ${period}`;
-  const results = { printed: false, saved: false, emailed: false };
+// ── Apps Script delivery (Drive + Gmail) ───────────────────
+async function sendToAppsScript(person, html, period) {
+  const filename = person.name + ' — ' + period;
+  const subject = 'Commission Report - ' + period;
+  const firstName = person.name.split(' ')[0];
+  const body = 'Dear ' + firstName + ',\n\nYour commission report for ' + period + ' is attached. Please open the attached file to review your report for this period. Let me know if you have any questions.\n\nThanks!';
 
-  // Print 2 copies
-  results.printed = await printReportWindow(html);
-
-  // Save to Drive
-  results.saved = await saveToDrive(html, filename);
-
-  // Email (skip print-only)
-  if (!person.print_only && person.email) {
-    const subject = `Commission Report - ${period}`;
-    const body = `Dear ${person.name.split(' ')[0]},
-
-Your commission report for ${period} is attached. Please open the attached file to review your report for this period. Let me know if you have any questions.
-
-Thanks!`;
-    results.emailed = await sendGmail(person.email, subject, body, html, filename + '.html');
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'saveAndEmail',
+        filename,
+        html,
+        to: (!person.print_only && person.email) ? person.email : null,
+        subject,
+        body,
+        printOnly: person.print_only || !person.email
+      })
+    });
+    const data = await res.json();
+    return data.success === true;
+  } catch(e) {
+    console.error('Apps Script error:', e);
+    return false;
   }
+}
+
+// ── Core report delivery ────────────────────────────────────
+async function deliverReport(person, sales, period, overrides) {
+  const html = buildReportHTML(person, sales, period, overrides);
+  const results = { printed: false, delivered: false };
+
+  results.printed = await printReportWindow(html);
+  results.delivered = await sendToAppsScript(person, html, period);
 
   return results;
 }
@@ -1227,7 +1157,7 @@ async function generateReport(personIdOverride) {
   if (results.delivered) {
     parts.push('saved to Drive');
     if (!person.print_only && person.email) parts.push('email sent');
-    else if (!person.email) parts.push('no email on file');
+    else parts.push('no email on file');
   } else {
     parts.push('Drive/email failed — check Apps Script');
   }
