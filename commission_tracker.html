@@ -145,7 +145,7 @@
         </div>
         <div class="form-group">
           <label>Rate (%)</label>
-          <input type="number" id="s-rate" step="0.01" oninput="calcCommission()" placeholder="Auto">
+          <input type="number" id="s-rate" step="0.01" oninput="document.getElementById('s-rate').dataset.manualEdit='1';calcCommission()" placeholder="Auto">
         </div>
         <div class="form-group">
           <label>Commission amount ($)</label>
@@ -542,13 +542,13 @@ async function getMonthlyTotal(personId) {
   const now = new Date();
   const start = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
   // Primary sales — credit their percentage (default 50% if split, 100% if not)
-  const primary = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${start}&cancelled=is.false&select=sale_price,split_salesperson_id,split_credit_pct`);
+  const primary = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${start}&or=(cancelled.is.null,cancelled.is.false)&select=sale_price,split_salesperson_id,split_credit_pct`);
   const primaryTotal = primary.reduce((s,r) => {
     const creditPct = r.split_salesperson_id ? (r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5) : 1.0;
     return s + Number(r.sale_price||0) * creditPct;
   }, 0);
   // Sales where this person is the split person — credit their portion (1 - primary credit)
-  const splitSales = await db('GET','sales',null,`?split_salesperson_id=eq.${personId}&date=gte.${start}&cancelled=is.false&select=sale_price,split_credit_pct`);
+  const splitSales = await db('GET','sales',null,`?split_salesperson_id=eq.${personId}&date=gte.${start}&or=(cancelled.is.null,cancelled.is.false)&select=sale_price,split_credit_pct`);
   const splitTotal = splitSales.reduce((s,r) => {
     const primaryPct = r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5;
     return s + Number(r.sale_price||0) * (1 - primaryPct);
@@ -581,7 +581,7 @@ function getSplitDefaultRate(saleType) {
 
 async function onPersonChange() { await calcCommission(); }
 async function onTypeChange() {
-  document.getElementById('s-rate').value = '';
+  const rf = document.getElementById('s-rate'); rf.value = ''; delete rf.dataset.manualEdit;
   await calcCommission();
   const saleType = document.getElementById('s-type').value;
   const splitRateEl = document.getElementById('s-splitrate');
@@ -599,11 +599,15 @@ async function calcCommission() {
 
   if (!personId || !saleType || !par) { document.getElementById('calc-preview').style.display='none'; return; }
 
-  let rateInput = parseFloat(document.getElementById('s-rate').value);
-  if (!rateInput && rateInput !== 0) {
+  const rateField = document.getElementById('s-rate');
+  let rateInput = parseFloat(rateField.value);
+  // Only auto-fill if the field is empty (not manually edited)
+  if (isNaN(rateInput) && !rateField.dataset.manualEdit) {
     const suggested = await getSuggestedRate(personId, saleType);
-    document.getElementById('s-rate').value = (suggested * 100).toFixed(2);
+    rateField.value = (suggested * 100).toFixed(2);
     rateInput = suggested * 100;
+  } else if (isNaN(rateInput)) {
+    rateInput = 0;
   }
 
   const rate = rateInput / 100;
@@ -679,7 +683,7 @@ async function saveSale() {
 }
 
 function clearSaleForm() {
-  ['s-customer','s-product','s-par','s-saleprice','s-rate','s-commission','s-splitrate','s-splitspiff','s-creditpct','s-notes'].forEach(id => { document.getElementById(id).value = ''; });
+  ['s-customer','s-product','s-par','s-saleprice','s-rate','s-commission','s-splitrate','s-splitspiff','s-creditpct','s-notes'].forEach(id => { const el = document.getElementById(id); el.value = ''; if (id==='s-rate') delete el.dataset.manualEdit; });
   document.getElementById('s-overage').value = '0';
   document.getElementById('s-spiff').value = '0';
   document.getElementById('s-pdcomm').value = '';
