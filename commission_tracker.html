@@ -923,15 +923,22 @@ async function loadDashboard() {
   if (!personId) { content.innerHTML = '<div class="card"><p style="color:#888;text-align:center;padding:2rem">Select a salesperson to view their dashboard.</p></div>'; return; }
   const person = salespeople.find(p => p.id === personId);
   const year = new Date().getFullYear();
-  const rows = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${year}-01-01&select=*&order=date`);
-  const now = new Date(); const curMonth = now.getMonth();
 
-  // monthly totals
+  // Fetch primary sales and split sales separately
+  const [primaryRows, splitRows] = await Promise.all([
+    db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${year}-01-01&or=(cancelled.is.null,cancelled.is.false)&select=*&order=date`),
+    db('GET','sales',null,`?split_salesperson_id=eq.${personId}&date=gte.${year}-01-01&or=(cancelled.is.null,cancelled.is.false)&select=*&order=date`)
+  ]);
+
+  const now = new Date(); const curMonth = now.getMonth();
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthData = Array.from({length:12},(_,i) => ({ name: monthNames[i], sales:0, commission:0, overage:0, spiff:0, paid:0 }));
-  rows.forEach(r => {
+
+  // Primary sales — credit their split_credit_pct of sale price (or 100% if no split)
+  primaryRows.forEach(r => {
     const m = new Date(r.date).getMonth();
-    monthData[m].sales += Number(r.sale_price||0);
+    const creditPct = r.split_salesperson_id ? (r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5) : 1.0;
+    monthData[m].sales += Number(r.sale_price||0) * creditPct;
     monthData[m].commission += Number(r.commission_amount||0);
     monthData[m].overage += Number(r.overage||0);
     monthData[m].spiff += Number(r.spiff||0);
@@ -939,6 +946,19 @@ async function loadDashboard() {
     if (r.pd_overage && r.pd_overage !== 'X') monthData[m].paid += Number(r.overage * (r.sale_type==='wholesale'?1:0.5)||0);
   });
 
+  // Split sales — credit (1 - split_credit_pct) of sale price, plus their split commission/overage
+  splitRows.forEach(r => {
+    const m = new Date(r.date).getMonth();
+    const primaryPct = r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5;
+    monthData[m].sales += Number(r.sale_price||0) * (1 - primaryPct);
+    monthData[m].commission += Number(r.split_rate||0) * Number(r.par_price||0);
+    const ovgMult = r.sale_type === 'wholesale' ? 0.5 : 0.25;
+    monthData[m].overage += Number(r.overage||0) * ovgMult;
+    monthData[m].spiff += Number(r.split_spiff_amount||0);
+  });
+
+  // Combine for outstanding calculation
+  const rows = primaryRows;
   const mtdSales = monthData[curMonth].sales;
   const tiers = commRates.filter(r => r.sale_type==='deck').sort((a,b) => a.min_sales-b.min_sales);
   let curTier = null;
@@ -960,7 +980,7 @@ async function loadDashboard() {
     return s;
   }, 0);
 
-  const totalSales = rows.reduce((s,r) => s+Number(r.sale_price||0),0);
+  const totalSales = monthData.reduce((s,m) => s+m.sales, 0);
   const activeMths = monthData.filter(m => m.sales > 0).length || 1;
   const avgMonthly = totalSales / activeMths;
 
