@@ -40,12 +40,6 @@
   td { padding: 0.7rem 0.75rem; border-bottom: 1px solid #f0ede8; color: #1a1a1a; vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #faf9f7; }
-  tr.cancelled td { color: #aaa; text-decoration: line-through; background: #faf9f7; }
-  tr.cancelled td.no-strike { text-decoration: none; }
-  th.sortable { cursor: pointer; user-select: none; }
-  th.sortable:hover { color: #1a1a1a; }
-  th.sort-asc::after { content: ' ↑'; }
-  th.sort-desc::after { content: ' ↓'; }
   .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 3px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; }
   .badge.building { background: #e8f0fb; color: #1a5cb5; }
   .badge.wholesaler { background: #e8f5ef; color: #1a7a4a; }
@@ -145,7 +139,7 @@
         </div>
         <div class="form-group">
           <label>Rate (%)</label>
-          <input type="number" id="s-rate" step="0.01" oninput="document.getElementById('s-rate').dataset.manualEdit='1';calcCommission()" placeholder="Auto">
+          <input type="number" id="s-rate" step="0.01" oninput="calcCommission()" placeholder="Auto">
         </div>
         <div class="form-group">
           <label>Commission amount ($)</label>
@@ -234,7 +228,6 @@
             <select id="f-status" onchange="loadLedger()">
               <option value="open">Open (unpaid items)</option>
               <option value="all">All records</option>
-              <option value="cancelled">Cancelled only</option>
             </select>
           </div>
           <button class="btn secondary small" onclick="loadLedger()">Refresh</button>
@@ -246,20 +239,10 @@
       <div style="overflow-x: auto;">
         <table>
           <thead>
-            <tr id="ledger-head">
-              <th class="sortable" onclick="sortLedger('date')">Date</th>
-              <th class="sortable" onclick="sortLedger('salesperson')">Salesperson</th>
-              <th class="sortable" onclick="sortLedger('customer_name')">Customer</th>
-              <th class="sortable" onclick="sortLedger('product')">Product</th>
-              <th class="sortable" onclick="sortLedger('sale_type')">Type</th>
-              <th class="sortable" onclick="sortLedger('par_price')">Par</th>
-              <th class="sortable" onclick="sortLedger('rate')">Rate</th>
-              <th class="sortable" onclick="sortLedger('commission_amount')">Commission</th>
-              <th>Pd Comm</th>
-              <th class="sortable" onclick="sortLedger('overage')">Overage</th>
-              <th>Pd Ovg</th>
-              <th class="sortable" onclick="sortLedger('spiff')">Spiff</th>
-              <th>Split</th><th>Actions</th>
+            <tr>
+              <th>Date</th><th>Salesperson</th><th>Customer</th><th>Product</th><th>Type</th>
+              <th>Par</th><th>Rate</th><th>Commission</th><th>Pd Comm</th>
+              <th>Overage</th><th>Pd Ovg</th><th>Spiff</th><th>Split</th><th>Actions</th>
             </tr>
           </thead>
           <tbody id="ledger-body">
@@ -291,23 +274,10 @@
   <!-- SALES MANAGER -->
   <div id="manager" class="section">
     <p class="page-title">Sales manager</p>
-    <p class="page-sub">Override commission (1.5% of par) on all buildings, decks, MAP, pools, and wholesale sales.</p>
+    <p class="page-sub">Shows all qualifying sales where commission is currently approved (X) but not yet paid out. Clears automatically when commission is marked as paid.</p>
     <div class="card" style="padding: 1rem;">
-      <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;">
-        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
-          <div class="form-group">
-            <label>Month</label>
-            <select id="m-month" onchange="loadManager()">
-              <option value="0">January</option><option value="1">February</option>
-              <option value="2">March</option><option value="3">April</option>
-              <option value="4">May</option><option value="5">June</option>
-              <option value="6">July</option><option value="7">August</option>
-              <option value="8">September</option><option value="9">October</option>
-              <option value="10">November</option><option value="11">December</option>
-            </select>
-          </div>
-          <button class="btn secondary small" onclick="loadManager()">Refresh</button>
-        </div>
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+        <button class="btn secondary small" onclick="loadManager()">Refresh</button>
       </div>
     </div>
     <div id="manager-content"></div>
@@ -542,13 +512,13 @@ async function getMonthlyTotal(personId) {
   const now = new Date();
   const start = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
   // Primary sales — credit their percentage (default 50% if split, 100% if not)
-  const primary = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${start}&or=(cancelled.is.null,cancelled.is.false)&select=sale_price,split_salesperson_id,split_credit_pct`);
+  const primary = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${start}&select=sale_price,split_salesperson_id,split_credit_pct`);
   const primaryTotal = primary.reduce((s,r) => {
     const creditPct = r.split_salesperson_id ? (r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5) : 1.0;
     return s + Number(r.sale_price||0) * creditPct;
   }, 0);
   // Sales where this person is the split person — credit their portion (1 - primary credit)
-  const splitSales = await db('GET','sales',null,`?split_salesperson_id=eq.${personId}&date=gte.${start}&or=(cancelled.is.null,cancelled.is.false)&select=sale_price,split_credit_pct`);
+  const splitSales = await db('GET','sales',null,`?split_salesperson_id=eq.${personId}&date=gte.${start}&select=sale_price,split_credit_pct`);
   const splitTotal = splitSales.reduce((s,r) => {
     const primaryPct = r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5;
     return s + Number(r.sale_price||0) * (1 - primaryPct);
@@ -581,7 +551,7 @@ function getSplitDefaultRate(saleType) {
 
 async function onPersonChange() { await calcCommission(); }
 async function onTypeChange() {
-  const rf = document.getElementById('s-rate'); rf.value = ''; delete rf.dataset.manualEdit;
+  document.getElementById('s-rate').value = '';
   await calcCommission();
   const saleType = document.getElementById('s-type').value;
   const splitRateEl = document.getElementById('s-splitrate');
@@ -599,15 +569,11 @@ async function calcCommission() {
 
   if (!personId || !saleType || !par) { document.getElementById('calc-preview').style.display='none'; return; }
 
-  const rateField = document.getElementById('s-rate');
-  let rateInput = parseFloat(rateField.value);
-  // Only auto-fill if the field is empty (not manually edited)
-  if (isNaN(rateInput) && !rateField.dataset.manualEdit) {
+  let rateInput = parseFloat(document.getElementById('s-rate').value);
+  if (!rateInput && rateInput !== 0) {
     const suggested = await getSuggestedRate(personId, saleType);
-    rateField.value = (suggested * 100).toFixed(2);
+    document.getElementById('s-rate').value = (suggested * 100).toFixed(2);
     rateInput = suggested * 100;
-  } else if (isNaN(rateInput)) {
-    rateInput = 0;
   }
 
   const rate = rateInput / 100;
@@ -683,7 +649,7 @@ async function saveSale() {
 }
 
 function clearSaleForm() {
-  ['s-customer','s-product','s-par','s-saleprice','s-rate','s-commission','s-splitrate','s-splitspiff','s-creditpct','s-notes'].forEach(id => { const el = document.getElementById(id); el.value = ''; if (id==='s-rate') delete el.dataset.manualEdit; });
+  ['s-customer','s-product','s-par','s-saleprice','s-rate','s-commission','s-splitrate','s-splitspiff','s-creditpct','s-notes'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('s-overage').value = '0';
   document.getElementById('s-spiff').value = '0';
   document.getElementById('s-pdcomm').value = '';
@@ -731,68 +697,24 @@ async function editSale(r) {
   await calcCommission();
 }
 
-let ledgerRows = [];
-let ledgerSort = { field: 'date', dir: 'desc' };
-
 async function loadLedger() {
   const personFilter = document.getElementById('f-person').value;
   const statusFilter = document.getElementById('f-status').value;
   let query = '?select=*,salesperson:salespeople!salesperson_id(name),split:salespeople!split_salesperson_id(name)&order=date.desc';
   if (personFilter) query += `&salesperson_id=eq.${personFilter}`;
   const rows = await db('GET','sales',null,query);
-
-  if (statusFilter === 'open') {
-    ledgerRows = rows.filter(r => {
-      if (r.cancelled) return false;
-      const commPaid = r.pd_commission && r.pd_commission !== 'X';
-      const ovgPaid = r.pd_overage && r.pd_overage !== 'X';
-      const hasOvg = r.overage > 0;
-      if (hasOvg) return !(commPaid && ovgPaid);
-      return !commPaid;
-    });
-  } else if (statusFilter === 'cancelled') {
-    ledgerRows = rows.filter(r => r.cancelled);
-  } else {
-    ledgerRows = rows;
-  }
-
-  renderLedger();
-}
-
-function sortLedger(field) {
-  if (ledgerSort.field === field) {
-    ledgerSort.dir = ledgerSort.dir === 'asc' ? 'desc' : 'asc';
-  } else {
-    ledgerSort.field = field;
-    ledgerSort.dir = 'asc';
-  }
-  // Update header indicators
-  document.querySelectorAll('#ledger-head th').forEach(th => {
-    th.classList.remove('sort-asc','sort-desc');
-  });
-  const idx = ['date','salesperson','customer_name','product','sale_type','par_price','rate','commission_amount','','overage','','spiff'].indexOf(field);
-  const ths = document.querySelectorAll('#ledger-head th');
-  if (idx >= 0 && ths[idx]) {
-    ths[idx].classList.add(ledgerSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
-  }
-  renderLedger();
-}
-
-function renderLedger() {
-  const sorted = [...ledgerRows].sort((a, b) => {
-    const f = ledgerSort.field;
-    let av = f === 'salesperson' ? (a.salesperson?.name||'') : (a[f]||'');
-    let bv = f === 'salesperson' ? (b.salesperson?.name||'') : (b[f]||'');
-    if (typeof av === 'string') av = av.toLowerCase();
-    if (typeof bv === 'string') bv = bv.toLowerCase();
-    if (av < bv) return ledgerSort.dir === 'asc' ? -1 : 1;
-    if (av > bv) return ledgerSort.dir === 'asc' ? 1 : -1;
-    return 0;
-  });
-
+  const filtered = statusFilter === 'open'
+    ? rows.filter(r => {
+        const commPaid = r.pd_commission && r.pd_commission !== 'X';
+        const ovgPaid = r.pd_overage && r.pd_overage !== 'X';
+        const hasOvg = r.overage > 0;
+        if (hasOvg) return !(commPaid && ovgPaid);
+        return !commPaid;
+      })
+    : rows;
   const tbody = document.getElementById('ledger-body');
-  if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state">No records found.</td></tr>'; return; }
-  tbody.innerHTML = sorted.map(r => {
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state">No records found.</td></tr>'; return; }
+  tbody.innerHTML = filtered.map(r => {
     const cs = !r.pd_commission ? `<span class="status-empty" title="Click to approve">—</span>`
       : r.pd_commission==='X' ? `<span class="status-x" title="Click to stamp date or remove">X</span>`
       : `<span class="status-paid" title="Click to undo">${r.pd_commission}</span>`;
@@ -800,27 +722,23 @@ function renderLedger() {
       : r.pd_overage==='X' ? `<span class="status-x" title="Click to stamp date or remove">X</span>`
       : `<span class="status-paid" title="Click to undo">${r.pd_overage}</span>`;
     const splitInfo = r.split?.name ? `<span style="font-size:0.78rem;color:#888">${r.split.name}</span>` : '—';
-    const isCancelled = !!r.cancelled;
-    const rj = JSON.stringify(r).replace(/"/g,'&quot;');
-    return `<tr class="${isCancelled ? 'cancelled' : ''}">
+    return `<tr>
       <td style="white-space:nowrap">${r.date}</td>
       <td>${r.salesperson?.name||'—'}</td>
       <td>${r.customer_name||'—'}</td>
       <td style="font-size:0.8rem">${r.product||'—'}</td>
-      <td class="no-strike"><span class="badge ${r.sale_type}">${r.sale_type.replace('_',' ')}</span>${isCancelled ? ' <span style="color:#c0392b;font-size:0.7rem;text-decoration:none">CANCELLED</span>' : ''}</td>
+      <td><span class="badge ${r.sale_type}">${r.sale_type.replace('_',' ')}</span></td>
       <td>${fmt(r.par_price)}</td>
       <td>${r.rate > 0 ? pct(r.rate) : '—'}</td>
       <td>${fmt(r.commission_amount)}</td>
-      <td style="cursor:pointer" onclick="${isCancelled ? '' : `toggleField('${r.id}','pd_commission','${r.pd_commission||''}')`}">${isCancelled ? '—' : cs}</td>
+      <td style="cursor:pointer" onclick="toggleField('${r.id}','pd_commission','${r.pd_commission||''}')">${cs}</td>
       <td>${fmt(r.overage)}</td>
-      <td style="cursor:pointer" onclick="${isCancelled ? '' : `toggleField('${r.id}','pd_overage','${r.pd_overage||''}')`}">${isCancelled ? '—' : os}</td>
+      <td style="cursor:pointer" onclick="toggleField('${r.id}','pd_overage','${r.pd_overage||''}')">${os}</td>
       <td>${r.spiff > 0 ? fmt(r.spiff) : '—'}</td>
       <td>${splitInfo}</td>
-      <td class="no-strike" style="white-space:nowrap">
-        ${!isCancelled ? `<button class="btn small secondary" onclick="markBothPaid('${r.id}',${r.overage>0})">Mark paid</button>
-        <button class="btn small secondary" style="margin-left:4px" onclick='editSale(${rj})'>Edit</button>
-        <button class="btn small danger" style="margin-left:4px" onclick="cancelSale('${r.id}','${r.pd_commission||''}','${r.pd_overage||''}')">Cancel</button>` : `<button class="btn small secondary" onclick="uncancelSale('${r.id}')">Uncancel</button>`}
-        <button class="btn small danger" style="margin-left:4px" onclick="deleteSale('${r.id}')">Delete</button>
+      <td style="white-space:nowrap">
+        <button class="btn small secondary" onclick="markBothPaid('${r.id}',${r.overage>0})">Mark paid</button>
+        <button class="btn small secondary" style="margin-left:4px" onclick="editSale(${JSON.stringify(r).replace(/"/g,'&quot;')})">Edit</button>
       </td>
     </tr>`;
   }).join('');
@@ -861,84 +779,21 @@ async function markAllXPaid() {
   loadLedger();
 }
 
-
-async function cancelSale(id, pdComm, pdOvg) {
-  const commPaid = pdComm && pdComm !== 'X';
-  const ovgPaid = pdOvg && pdOvg !== 'X';
-
-  let msg = 'Mark this sale as cancelled?';
-  if (commPaid && ovgPaid) {
-    msg = 'Commission and overage have both been paid. This will mark the sale as cancelled — no automatic clawback. Are you sure?';
-  } else if (commPaid) {
-    msg = 'Commission has already been paid on this sale. This will mark it as cancelled — no automatic clawback on paid commission. Continue?';
-  } else if (pdComm === 'X' || pdOvg === 'X') {
-    msg = 'This sale has approved but unpaid amounts. Cancelling will clear those approvals. Continue?';
-  }
-
-  if (!confirm(msg)) return;
-
-  // Get full sale to recalculate monthly total impact
-  const rows = await db('GET','sales',null,`?id=eq.${id}&select=*`);
-  const sale = rows[0];
-
-  // Build update — clear unpaid approvals, mark cancelled
-  const update = { cancelled: true, cancelled_at: new Date().toISOString() };
-  if (sale.pd_commission === 'X') update.pd_commission = null;
-  if (sale.pd_overage === 'X') update.pd_overage = null;
-
-  // If commission not paid, recalculate rate for salesperson
-  if (!commPaid && sale.salesperson_id) {
-    // We just mark cancelled — getMonthlyTotal will exclude cancelled sales automatically
-    // The dashboard will reflect updated totals on next load
-  }
-
-  try {
-    await db('PATCH','sales',update,`?id=eq.${id}`);
-    showMsg('Sale marked as cancelled.','success');
-    loadLedger();
-  } catch(e) { showMsg('Error: '+e.message,'error'); }
-}
-
-async function uncancelSale(id) {
-  if (!confirm('Restore this sale and remove the cancellation?')) return;
-  try {
-    await db('PATCH','sales',{ cancelled: false, cancelled_at: null },`?id=eq.${id}`);
-    showMsg('Sale restored.','success');
-    loadLedger();
-  } catch(e) { showMsg('Error: '+e.message,'error'); }
-}
-
-async function deleteSale(id) {
-  if (!confirm('Permanently delete this sale? This cannot be undone.')) return;
-  try {
-    await db('DELETE','sales',null,`?id=eq.${id}`);
-    showMsg('Sale deleted.','success');
-    loadLedger();
-  } catch(e) { showMsg('Error: '+e.message,'error'); }
-}
-
 async function loadDashboard() {
   const personId = document.getElementById('d-person').value;
   const content = document.getElementById('dashboard-content');
   if (!personId) { content.innerHTML = '<div class="card"><p style="color:#888;text-align:center;padding:2rem">Select a salesperson to view their dashboard.</p></div>'; return; }
   const person = salespeople.find(p => p.id === personId);
   const year = new Date().getFullYear();
-
-  // Fetch primary sales and split sales separately
-  const [primaryRows, splitRows] = await Promise.all([
-    db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${year}-01-01&or=(cancelled.is.null,cancelled.is.false)&select=*&order=date`),
-    db('GET','sales',null,`?split_salesperson_id=eq.${personId}&date=gte.${year}-01-01&or=(cancelled.is.null,cancelled.is.false)&select=*&order=date`)
-  ]);
-
+  const rows = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${year}-01-01&select=*&order=date`);
   const now = new Date(); const curMonth = now.getMonth();
+
+  // monthly totals
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthData = Array.from({length:12},(_,i) => ({ name: monthNames[i], sales:0, commission:0, overage:0, spiff:0, paid:0 }));
-
-  // Primary sales — credit their split_credit_pct of sale price (or 100% if no split)
-  primaryRows.forEach(r => {
+  rows.forEach(r => {
     const m = new Date(r.date).getMonth();
-    const creditPct = r.split_salesperson_id ? (r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5) : 1.0;
-    monthData[m].sales += Number(r.sale_price||0) * creditPct;
+    monthData[m].sales += Number(r.sale_price||0);
     monthData[m].commission += Number(r.commission_amount||0);
     monthData[m].overage += Number(r.overage||0);
     monthData[m].spiff += Number(r.spiff||0);
@@ -946,19 +801,6 @@ async function loadDashboard() {
     if (r.pd_overage && r.pd_overage !== 'X') monthData[m].paid += Number(r.overage * (r.sale_type==='wholesale'?1:0.5)||0);
   });
 
-  // Split sales — credit (1 - split_credit_pct) of sale price, plus their split commission/overage
-  splitRows.forEach(r => {
-    const m = new Date(r.date).getMonth();
-    const primaryPct = r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5;
-    monthData[m].sales += Number(r.sale_price||0) * (1 - primaryPct);
-    monthData[m].commission += Number(r.split_rate||0) * Number(r.par_price||0);
-    const ovgMult = r.sale_type === 'wholesale' ? 0.5 : 0.25;
-    monthData[m].overage += Number(r.overage||0) * ovgMult;
-    monthData[m].spiff += Number(r.split_spiff_amount||0);
-  });
-
-  // Combine for outstanding calculation
-  const rows = primaryRows;
   const mtdSales = monthData[curMonth].sales;
   const tiers = commRates.filter(r => r.sale_type==='deck').sort((a,b) => a.min_sales-b.min_sales);
   let curTier = null;
@@ -980,7 +822,7 @@ async function loadDashboard() {
     return s;
   }, 0);
 
-  const totalSales = monthData.reduce((s,m) => s+m.sales, 0);
+  const totalSales = rows.reduce((s,r) => s+Number(r.sale_price||0),0);
   const activeMths = monthData.filter(m => m.sales > 0).length || 1;
   const avgMonthly = totalSales / activeMths;
 
@@ -1020,26 +862,24 @@ async function loadDashboard() {
 async function loadManager() {
   const monthVal = parseInt(document.getElementById('m-month').value);
   const year = new Date().getFullYear();
-  const monthStr = String(monthVal+1).padStart(2,'0');
-  const start = `${year}-${monthStr}-01`;
-  const lastDay = new Date(year, monthVal+1, 0).getDate();
-  const end = `${year}-${monthStr}-${lastDay}`;
   const monthName = new Date(year,monthVal,1).toLocaleString('default',{month:'long'});
 
+  // Only show sales where pd_commission = X (approved for this period, not yet paid out)
+  // These are the ones the sales manager gets paid on right now
   const rows = await db('GET','sales',null,
-    `?select=*,salesperson:salespeople!salesperson_id(name)&date=gte.${start}&date=lte.${end}&sale_type=in.(${OVERRIDE_TYPES.join(',')})&order=date`);
+    `?select=*,salesperson:salespeople!salesperson_id(name)&pd_commission=eq.X&sale_type=in.(${OVERRIDE_TYPES.join(',')})&or=(cancelled.is.null,cancelled.is.false)&order=date`);
 
   const total = rows.reduce((s,r) => s + Number(r.par_price||0)*0.015, 0);
   const content = document.getElementById('manager-content');
 
   if (!rows.length) {
-    content.innerHTML = `<div class="card"><p style="color:#888;text-align:center;padding:2rem">No qualifying sales found for ${monthName} ${year}.</p></div>`;
+    content.innerHTML = `<div class="card"><p style="color:#888;text-align:center;padding:2rem">No qualifying sales pending override payment right now.</p></div>`;
     return;
   }
 
   content.innerHTML = `
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">Override total — ${monthName}</div><div class="stat-value">${fmt(total)}</div><div class="stat-sub">${rows.length} qualifying sale${rows.length!==1?'s':''}</div></div>
+      <div class="stat-card"><div class="stat-label">Override pending payment</div><div class="stat-value">${fmt(total)}</div><div class="stat-sub">${rows.length} qualifying sale${rows.length!==1?'s':''}</div></div>
       <div class="stat-card"><div class="stat-label">Total par (qualifying)</div><div class="stat-value">${fmt(rows.reduce((s,r)=>s+Number(r.par_price||0),0))}</div></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
@@ -1057,7 +897,7 @@ async function loadManager() {
             <td style="font-weight:500">${fmt(Number(r.par_price)*0.015)}</td>
           </tr>`).join('')}
           <tr style="font-weight:500;border-top:1px solid #e0ddd8">
-            <td colspan="7" style="text-align:right">Total override for ${monthName}</td>
+            <td colspan="7" style="text-align:right">Total override pending</td>
             <td>${fmt(total)}</td>
           </tr>
         </tbody>
@@ -1219,9 +1059,9 @@ async function getReportData(personId, period) {
 }
 
 async function getOverrideData(period) {
-  const year = new Date().getFullYear();
+  // Only include sales where commission is approved (X) — same logic as the manager tab
   const rows = await db('GET','sales',null,
-    `?select=*,salesperson:salespeople!salesperson_id(name)&sale_type=in.(${OVERRIDE_TYPES.join(',')})&order=date`);
+    `?select=*,salesperson:salespeople!salesperson_id(name)&pd_commission=eq.X&sale_type=in.(${OVERRIDE_TYPES.join(',')})&or=(cancelled.is.null,cancelled.is.false)&order=date`);
   return rows;
 }
 
