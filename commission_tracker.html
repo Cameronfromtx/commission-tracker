@@ -474,6 +474,8 @@ async function db(method, table, body, query) {
 
 let salespeople = [], commRates = [];
 let editingId = null;
+let editingPdComm = null;
+let editingPdOvg = null;
 
 function getPeriodLabel() {
   const today = new Date(); const day = today.getDate();
@@ -532,6 +534,7 @@ async function loadRates() {
 async function getMonthlyTotal(personId) {
   const now = new Date();
   const start = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  // Note: date comparisons in Supabase are string-based YYYY-MM-DD so timezone isn't an issue here
   // Primary sales — credit their percentage (default 50% if split, 100% if not)
   const primary = await db('GET','sales',null,`?salesperson_id=eq.${personId}&date=gte.${start}&or=(cancelled.is.null,cancelled.is.false)&select=sale_price,split_salesperson_id,split_credit_pct`);
   const primaryTotal = primary.reduce((s,r) => {
@@ -647,8 +650,15 @@ async function saveSale() {
     sale_price: parseFloat(document.getElementById('s-saleprice').value) || 0,
     rate: (parseFloat(document.getElementById('s-rate').value) || 0) / 100,
     commission_amount: parseFloat(document.getElementById('s-commission').value) || 0,
-    pd_commission: document.getElementById('s-pdcomm').value || null,
-    overage, pd_overage: document.getElementById('s-pdovg').value || null,
+    pd_commission: (() => {
+      if (editingId && editingPdComm && editingPdComm !== 'X') return editingPdComm;
+      return document.getElementById('s-pdcomm').value || null;
+    })(),
+    overage,
+    pd_overage: (() => {
+      if (editingId && editingPdOvg && editingPdOvg !== 'X') return editingPdOvg;
+      return document.getElementById('s-pdovg').value || null;
+    })(),
     spiff,
     split_salesperson_id: splitId || null,
     split_rate: splitId ? ((parseFloat(document.getElementById('s-splitrate').value) || splitDefaultRate*100) / 100) : null,
@@ -900,7 +910,7 @@ async function loadDashboard() {
   const monthData = Array.from({length:12},(_,i) => ({ name: monthNames[i], sales:0, commission:0, overage:0, spiff:0, paid:0 }));
 
   primaryRows.forEach(r => {
-    const m = new Date(r.date).getMonth();
+    const m = new Date(r.date + "T00:00:00").getMonth();
     const creditPct = r.split_salesperson_id ? (r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5) : 1.0;
     monthData[m].sales += Number(r.sale_price||0) * creditPct;
     monthData[m].commission += Number(r.commission_amount||0);
@@ -911,7 +921,7 @@ async function loadDashboard() {
   });
 
   splitRows.forEach(r => {
-    const m = new Date(r.date).getMonth();
+    const m = new Date(r.date + "T00:00:00").getMonth();
     const primaryPct = r.split_credit_pct !== null ? Number(r.split_credit_pct) : 0.5;
     monthData[m].sales += Number(r.sale_price||0) * (1 - primaryPct);
     monthData[m].commission += Number(r.split_rate||0) * Number(r.par_price||0);
