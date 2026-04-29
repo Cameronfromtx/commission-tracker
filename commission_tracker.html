@@ -43,8 +43,6 @@
   tr:hover td { background: #faf9f7; }
   tr.cancelled td { color: #aaa; text-decoration: line-through; background: #faf9f7; }
   tr.cancelled td.no-strike { text-decoration: none; }
-  tr.pending-payment td { background: #fffbe6 !important; }
-  tr.pending-payment:hover td { background: #fff7cc !important; }
   th.sortable { cursor: pointer; user-select: none; }
   th.sortable:hover { color: #1a1a1a; }
   th.sort-asc::after { content: ' ↑'; }
@@ -801,7 +799,6 @@ function renderLedger() {
   if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state">No records found.</td></tr>'; return; }
   tbody.innerHTML = sorted.map(r => {
     const isCancelled = !!r.cancelled;
-    const hasPendingX = !isCancelled && (r.pd_commission === 'X' || r.pd_overage === 'X');
     const cs = !r.pd_commission ? `<span class="status-empty" title="Click to approve">—</span>`
       : r.pd_commission==='X' ? `<span class="status-x" title="Click to stamp date or remove">X</span>`
       : `<span class="status-paid" title="Click to undo">${r.pd_commission}</span>`;
@@ -810,7 +807,7 @@ function renderLedger() {
       : `<span class="status-paid" title="Click to undo">${r.pd_overage}</span>`;
     const splitInfo = r.split?.name ? `<span style="font-size:0.78rem;color:#888">${r.split.name}</span>` : '—';
     const rj = JSON.stringify(r).replace(/"/g,'&quot;');
-    return `<tr class="${isCancelled ? 'cancelled' : hasPendingX ? 'pending-payment' : ''}">
+    return `<tr class="${isCancelled ? 'cancelled' : ''}">
       <td style="white-space:nowrap">${r.date}</td>
       <td>${r.salesperson?.name||'—'}</td>
       <td>${r.customer_name||'—'}</td>
@@ -1097,7 +1094,8 @@ function buildReportHTML(person, sales, period, overrides) {
 
   const rows = sales.map(r => {
     const splitName = r.split?.name || '';
-    return `<tr>
+    const isPending = r.pd_commission === 'X' || r.pd_overage === 'X';
+    return `<tr${isPending ? ' style="background:#fffbe6"' : ''}>
       <td>${r.date}</td>
       <td>${r.customer_name||''}</td>
       <td>${r.product||''}</td>
