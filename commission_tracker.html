@@ -1095,7 +1095,7 @@ function buildReportHTML(person, sales, period, overrides) {
   const rows = sales.map(r => {
     const splitName = r.split?.name || '';
     const isPending = r.pd_commission === 'X' || r.pd_overage === 'X';
-    return `<tr${isPending ? ' style="background:#fffbe6"' : ''}>
+    return `<tr${isPending ? ' style="background:#FFE500;-webkit-print-color-adjust:exact;print-color-adjust:exact;"' : ''}>
       <td>${r.date}</td>
       <td>${r.customer_name||''}</td>
       <td>${r.product||''}</td>
@@ -1124,7 +1124,7 @@ function buildReportHTML(person, sales, period, overrides) {
   <title>${person.name} — ${period}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; padding: 1.5cm; }
+    body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; padding: 1.5cm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     h2 { font-size: 13pt; font-weight: bold; margin-bottom: 2px; }
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 2px solid #000; padding-bottom: 10px; }
     .header-left h2 { font-size: 14pt; }
