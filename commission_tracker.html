@@ -14,7 +14,8 @@
   nav button { padding: 0.85rem 1.5rem; border: none; background: none; cursor: pointer; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: #888; border-bottom: 2px solid transparent; transition: all 0.15s; }
   nav button:hover { color: #1a1a1a; }
   nav button.active { color: #1a1a1a; border-bottom-color: #1a1a1a; }
-  main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+  main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+  #ledger table { min-width: 1200px; }
   .section { display: none; }
   .section.active { display: block; }
   .page-title { font-size: 1.4rem; font-weight: 400; margin-bottom: 0.25rem; }
@@ -42,6 +43,8 @@
   tr:hover td { background: #faf9f7; }
   tr.cancelled td { color: #aaa; text-decoration: line-through; background: #faf9f7; }
   tr.cancelled td.no-strike { text-decoration: none; }
+  tr.pending-payment td { background: #fffbe6 !important; }
+  tr.pending-payment:hover td { background: #fff7cc !important; }
   th.sortable { cursor: pointer; user-select: none; }
   th.sortable:hover { color: #1a1a1a; }
   th.sort-asc::after { content: ' ↑'; }
@@ -651,12 +654,12 @@ async function saveSale() {
     rate: (parseFloat(document.getElementById('s-rate').value) || 0) / 100,
     commission_amount: parseFloat(document.getElementById('s-commission').value) || 0,
     pd_commission: (() => {
-      if (editingId && editingPdComm && editingPdComm !== 'X') return editingPdComm;
+      if (editingId && editingPdComm !== null) return editingPdComm;
       return document.getElementById('s-pdcomm').value || null;
     })(),
     overage,
     pd_overage: (() => {
-      if (editingId && editingPdOvg && editingPdOvg !== 'X') return editingPdOvg;
+      if (editingId && editingPdOvg !== null) return editingPdOvg;
       return document.getElementById('s-pdovg').value || null;
     })(),
     spiff,
@@ -676,7 +679,13 @@ async function saveSale() {
       showMsg('Sale saved successfully.','success');
     }
     clearSaleForm();
-  } catch(e) { showMsg('Error saving sale: '+e.message,'error'); }
+  } catch(e) {
+    let msg = e.message;
+    if (msg && msg.includes('sales_sale_type_check')) {
+      msg = 'The "Other" sale type is not yet enabled in your database. Run this SQL in Supabase → SQL Editor: ALTER TABLE sales DROP CONSTRAINT sales_sale_type_check; ALTER TABLE sales ADD CONSTRAINT sales_sale_type_check CHECK (sale_type IN (\'deck\',\'building\',\'map\',\'pool\',\'spa\',\'chemical\',\'wholesale\',\'concrete\',\'state_fair\',\'other\'));';
+    }
+    showMsg('Error saving sale: ' + msg, 'error');
+  }
 }
 
 function clearSaleForm() {
@@ -697,6 +706,8 @@ function clearSaleForm() {
 
 async function editSale(r) {
   editingId = r.id;
+  editingPdComm = r.pd_commission || null;
+  editingPdOvg = r.pd_overage || null;
   showSection('sales', document.querySelector('nav button'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.querySelector('nav button').classList.add('active');
@@ -790,6 +801,7 @@ function renderLedger() {
   if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state">No records found.</td></tr>'; return; }
   tbody.innerHTML = sorted.map(r => {
     const isCancelled = !!r.cancelled;
+    const hasPendingX = !isCancelled && (r.pd_commission === 'X' || r.pd_overage === 'X');
     const cs = !r.pd_commission ? `<span class="status-empty" title="Click to approve">—</span>`
       : r.pd_commission==='X' ? `<span class="status-x" title="Click to stamp date or remove">X</span>`
       : `<span class="status-paid" title="Click to undo">${r.pd_commission}</span>`;
@@ -798,7 +810,7 @@ function renderLedger() {
       : `<span class="status-paid" title="Click to undo">${r.pd_overage}</span>`;
     const splitInfo = r.split?.name ? `<span style="font-size:0.78rem;color:#888">${r.split.name}</span>` : '—';
     const rj = JSON.stringify(r).replace(/"/g,'&quot;');
-    return `<tr class="${isCancelled ? 'cancelled' : ''}">
+    return `<tr class="${isCancelled ? 'cancelled' : hasPendingX ? 'pending-payment' : ''}">
       <td style="white-space:nowrap">${r.date}</td>
       <td>${r.salesperson?.name||'—'}</td>
       <td>${r.customer_name||'—'}</td>
@@ -989,12 +1001,7 @@ async function loadDashboard() {
 }
 
 async function loadManager() {
-  const monthVal = parseInt(document.getElementById('m-month').value);
-  const year = new Date().getFullYear();
-  const monthName = new Date(year,monthVal,1).toLocaleString('default',{month:'long'});
-
-  // Only show sales where pd_commission = X (approved for this period, not yet paid out)
-  // These are the ones the sales manager gets paid on right now
+  // Only show sales where pd_commission = X (approved, not yet paid out)
   const rows = await db('GET','sales',null,
     `?select=*,salesperson:salespeople!salesperson_id(name)&pd_commission=eq.X&sale_type=in.(${OVERRIDE_TYPES.join(',')})&or=(cancelled.is.null,cancelled.is.false)&order=date`);
 
