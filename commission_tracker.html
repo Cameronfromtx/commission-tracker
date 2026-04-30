@@ -1084,9 +1084,14 @@ function initReports() {
 function buildReportHTML(person, sales, period, overrides) {
   const isMgr = person.is_sales_manager;
   const ovgMultiplier = (type) => type === 'wholesale' ? 1 : 0.5;
+  const calcOvg = (r) => {
+    if (r._isSplitRole) return Number(r.overage || 0);
+    if (r.split_salesperson_id) return Number(r.overage || 0) * ovgMultiplier(r.sale_type) * 0.5;
+    return Number(r.overage || 0) * ovgMultiplier(r.sale_type);
+  };
 
   const commPaidTotal = sales.reduce((s,r) => r.pd_commission==='X' ? s+Number(r.commission_amount||0) : s, 0);
-  const ovgPaidTotal = sales.reduce((s,r) => r.pd_overage==='X' ? s+Number(r.overage||0)*ovgMultiplier(r.sale_type) : s, 0);
+  const ovgPaidTotal = sales.reduce((s,r) => r.pd_overage==='X' ? s+calcOvg(r) : s, 0);
   const spiffPaidTotal = sales.reduce((s,r) => r.pd_commission==='X' ? s+Number(r.spiff||0) : s, 0);
   const totalPaid = commPaidTotal + ovgPaidTotal + spiffPaidTotal;
 
@@ -1095,6 +1100,18 @@ function buildReportHTML(person, sales, period, overrides) {
   const rows = sales.map(r => {
     const splitName = r.split?.name || '';
     const isPending = r.pd_commission === 'X' || r.pd_overage === 'X';
+    const hasSplitPartner = !!r.split_salesperson_id;
+    // For primary on a split sale: their overage portion is half of what a solo seller gets
+    // For the split role row: overage is already stored as the exact dollar amount
+    // For solo sales: apply the normal ovgMultiplier
+    let ovgDisplay = 0;
+    if (r._isSplitRole) {
+      ovgDisplay = Number(r.overage || 0); // already the correct share, no multiplier
+    } else if (hasSplitPartner) {
+      ovgDisplay = Number(r.overage || 0) * ovgMultiplier(r.sale_type) * 0.5; // primary's half of the salesperson portion
+    } else {
+      ovgDisplay = Number(r.overage || 0) * ovgMultiplier(r.sale_type); // solo seller gets full portion
+    }
     return `<tr${isPending ? ' style="background:#FFE500;-webkit-print-color-adjust:exact;print-color-adjust:exact;"' : ''}>
       <td>${r.date}</td>
       <td>${r.customer_name||''}</td>
@@ -1103,7 +1120,7 @@ function buildReportHTML(person, sales, period, overrides) {
       <td>${r.rate > 0 ? pctR(r.rate) : '—'}</td>
       <td>${fmtR(r.commission_amount)}</td>
       <td style="color:${r.pd_commission==='X'?'#c0392b':'#1a7a4a'}">${r.pd_commission||''}</td>
-      <td>${r.overage > 0 ? fmtR(r.overage*ovgMultiplier(r.sale_type)) : ''}</td>
+      <td>${ovgDisplay > 0 ? fmtR(ovgDisplay) : ''}</td>
       <td style="color:${r.pd_overage==='X'?'#c0392b':'#1a7a4a'}">${r.pd_overage||''}</td>
       <td>${r.spiff > 0 ? fmtR(r.spiff) : ''}</td>
       <td>${splitName}</td>
@@ -1190,19 +1207,16 @@ async function getReportData(personId, period) {
 
   // For split sales, remap fields so the report shows the correct split amounts
   const remappedSplitSales = splitSales.map(r => {
-    const splitPct = Number(r.split_credit_pct || 0);
-    const primaryPct = 1 - splitPct;
     return {
       ...r,
       _isSplitRole: true,
       // Show the primary person's name in the Split column
       split: { name: r.salesperson?.name || '' },
-      // Commission is the split person's share
-      commission_amount: Number(r.commission_amount || 0) * splitPct,
+      // Use the stored split amounts directly — they are already the correct share
+      commission_amount: Number(r.split_commission_amount ?? r.commission_amount ?? 0),
       rate: r.split_rate || r.rate,
       overage: Number(r.split_overage_amount || 0),
       spiff: Number(r.split_spiff_amount || 0),
-      // Paid columns track the same pd_commission/pd_overage flags
     };
   });
 
