@@ -1180,9 +1180,36 @@ function fmtR(n) { return Number(n||0).toLocaleString('en-US',{style:'currency',
 function pctR(n) { return (Number(n||0)*100).toFixed(2)+'%'; }
 
 async function getReportData(personId, period) {
-  const sales = await db('GET','sales',null,
+  // Fetch sales where this person is the PRIMARY salesperson
+  const primarySales = await db('GET','sales',null,
     `?salesperson_id=eq.${personId}&or=(cancelled.is.null,cancelled.is.false)&select=*,split:salespeople!split_salesperson_id(name)&order=date`);
-  const open = sales.filter(r => {
+
+  // Fetch sales where this person is the SPLIT partner
+  const splitSales = await db('GET','sales',null,
+    `?split_salesperson_id=eq.${personId}&or=(cancelled.is.null,cancelled.is.false)&select=*,salesperson:salespeople!salesperson_id(name)&order=date`);
+
+  // For split sales, remap fields so the report shows the correct split amounts
+  const remappedSplitSales = splitSales.map(r => {
+    const splitPct = Number(r.split_credit_pct || 0);
+    const primaryPct = 1 - splitPct;
+    return {
+      ...r,
+      _isSplitRole: true,
+      // Show the primary person's name in the Split column
+      split: { name: r.salesperson?.name || '' },
+      // Commission is the split person's share
+      commission_amount: Number(r.commission_amount || 0) * splitPct,
+      rate: r.split_rate || r.rate,
+      overage: Number(r.split_overage_amount || 0),
+      spiff: Number(r.split_spiff_amount || 0),
+      // Paid columns track the same pd_commission/pd_overage flags
+    };
+  });
+
+  const allSales = [...primarySales, ...remappedSplitSales]
+    .sort((a, b) => a.date > b.date ? 1 : -1);
+
+  const open = allSales.filter(r => {
     const commPaid = r.pd_commission && r.pd_commission !== 'X';
     const ovgPaid = r.pd_overage && r.pd_overage !== 'X';
     const hasOvg = r.overage > 0;
