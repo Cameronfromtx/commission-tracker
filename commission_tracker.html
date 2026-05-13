@@ -189,8 +189,12 @@
           <input type="number" id="s-splitrate" step="0.01" placeholder="Auto">
         </div>
         <div class="form-group">
-          <label>Split overage ($)</label>
-          <input type="number" id="s-splitovg" step="0.01" placeholder="Auto (50%)">
+          <label>Primary overage ($) <span style="font-size:0.78rem;color:#888">override</span></label>
+          <input type="number" id="s-primaryovg" step="0.01" placeholder="Auto">
+        </div>
+        <div class="form-group">
+          <label>Split overage ($) <span style="font-size:0.78rem;color:#888">override</span></label>
+          <input type="number" id="s-splitovg" step="0.01" placeholder="Auto">
         </div>
         <div class="form-group">
           <label>Split spiff ($)</label>
@@ -656,6 +660,7 @@ async function saveSale() {
       return document.getElementById('s-pdcomm').value || null;
     })(),
     overage,
+    primary_overage_override: splitId ? (parseFloat(document.getElementById('s-primaryovg').value) || null) : null,
     pd_overage: (() => {
       if (editingId && editingPdOvg !== null) return editingPdOvg;
       return document.getElementById('s-pdovg').value || null;
@@ -682,6 +687,9 @@ async function saveSale() {
     if (msg && msg.includes('sales_sale_type_check')) {
       msg = 'The "Other" sale type is not yet enabled in your database. Run this SQL in Supabase → SQL Editor: ALTER TABLE sales DROP CONSTRAINT sales_sale_type_check; ALTER TABLE sales ADD CONSTRAINT sales_sale_type_check CHECK (sale_type IN (\'deck\',\'building\',\'map\',\'pool\',\'spa\',\'chemical\',\'wholesale\',\'concrete\',\'state_fair\',\'other\'));';
     }
+    if (msg && msg.includes('primary_overage_override')) {
+      msg = 'New column needed in your database. Run this SQL in Supabase → SQL Editor: ALTER TABLE sales ADD COLUMN IF NOT EXISTS primary_overage_override numeric;';
+    }
     showMsg('Error saving sale: ' + msg, 'error');
   }
 }
@@ -694,6 +702,7 @@ function clearSaleForm() {
   document.getElementById('s-pdovg').value = '';
   document.getElementById('s-split').value = '';
   document.getElementById('s-splitovg').value = '';
+  document.getElementById('s-primaryovg').value = '';
   document.getElementById('calc-preview').style.display = 'none';
   editingId = null;
   document.getElementById('save-btn').textContent = 'Save sale';
@@ -730,6 +739,7 @@ async function editSale(r) {
   document.getElementById('s-split').value = r.split_salesperson_id || '';
   document.getElementById('s-splitrate').value = r.split_rate ? (r.split_rate * 100).toFixed(2) : '';
   document.getElementById('s-splitovg').value = r.split_overage_amount || '';
+  document.getElementById('s-primaryovg').value = r.primary_overage_override || '';
   document.getElementById('s-splitspiff').value = r.split_spiff_amount || '';
   document.getElementById('s-creditpct').value = r.split_credit_pct ? (r.split_credit_pct * 100) : '';
   document.getElementById('s-notes').value = r.notes || '';
@@ -1086,7 +1096,10 @@ function buildReportHTML(person, sales, period, overrides) {
   const ovgMultiplier = (type) => type === 'wholesale' ? 1 : 0.5;
   const calcOvg = (r) => {
     if (r._isSplitRole) return Number(r.overage || 0);
-    if (r.split_salesperson_id) return Number(r.overage || 0) * ovgMultiplier(r.sale_type) * 0.5;
+    if (r.split_salesperson_id) {
+      if (r.primary_overage_override != null) return Number(r.primary_overage_override);
+      return Number(r.overage || 0) * ovgMultiplier(r.sale_type) * 0.5;
+    }
     return Number(r.overage || 0) * ovgMultiplier(r.sale_type);
   };
 
@@ -1104,14 +1117,7 @@ function buildReportHTML(person, sales, period, overrides) {
     // For primary on a split sale: their overage portion is half of what a solo seller gets
     // For the split role row: overage is already stored as the exact dollar amount
     // For solo sales: apply the normal ovgMultiplier
-    let ovgDisplay = 0;
-    if (r._isSplitRole) {
-      ovgDisplay = Number(r.overage || 0); // already the correct share, no multiplier
-    } else if (hasSplitPartner) {
-      ovgDisplay = Number(r.overage || 0) * ovgMultiplier(r.sale_type) * 0.5; // primary's half of the salesperson portion
-    } else {
-      ovgDisplay = Number(r.overage || 0) * ovgMultiplier(r.sale_type); // solo seller gets full portion
-    }
+    let ovgDisplay = calcOvg(r);
     return `<tr${isPending ? ' style="background:#FFE500;-webkit-print-color-adjust:exact;print-color-adjust:exact;"' : ''}>
       <td>${r.date}</td>
       <td>${r.customer_name||''}</td>
