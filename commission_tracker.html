@@ -1103,9 +1103,15 @@ function buildReportHTML(person, sales, period, overrides) {
     return Number(r.overage || 0) * ovgMultiplier(r.sale_type);
   };
 
+  const calcSpiff = (r) => {
+    if (r._isSplitRole) return Number(r.spiff || 0); // already stored as split person's share
+    if (r.split_salesperson_id) return Number(r.spiff || 0) * 0.5; // primary gets half
+    return Number(r.spiff || 0); // solo gets full
+  };
+
   const commPaidTotal = sales.reduce((s,r) => r.pd_commission==='X' ? s+Number(r.commission_amount||0) : s, 0);
   const ovgPaidTotal = sales.reduce((s,r) => r.pd_overage==='X' ? s+calcOvg(r) : s, 0);
-  const spiffPaidTotal = sales.reduce((s,r) => r.pd_commission==='X' ? s+Number(r.spiff||0) : s, 0);
+  const spiffPaidTotal = sales.reduce((s,r) => r.pd_commission==='X' ? s+calcSpiff(r) : s, 0);
   const totalPaid = commPaidTotal + ovgPaidTotal + spiffPaidTotal;
 
   const overrideTotal = overrides ? overrides.reduce((s,r) => s+Number(r.par_price||0)*0.015, 0) : 0;
@@ -1128,7 +1134,7 @@ function buildReportHTML(person, sales, period, overrides) {
       <td style="color:${r.pd_commission==='X'?'#c0392b':'#1a7a4a'}">${r.pd_commission||''}</td>
       <td>${ovgDisplay > 0 ? fmtR(ovgDisplay) : ''}</td>
       <td style="color:${r.pd_overage==='X'?'#c0392b':'#1a7a4a'}">${r.pd_overage||''}</td>
-      <td>${r.spiff > 0 ? fmtR(r.spiff) : ''}</td>
+      <td>${calcSpiff(r) > 0 ? fmtR(calcSpiff(r)) : ''}</td>
       <td>${splitName}</td>
     </tr>`;
   }).join('');
